@@ -19,25 +19,44 @@ import {
   TrendingUp,
   HeadphonesIcon,
   Globe,
-  Lock,
   Wallet,
   Receipt,
   FileText,
   Calculator,
   Sparkles,
+  Landmark,
+  Contact,
+  FileCheck,
+  Percent,
+  SmartphoneIcon,
+  CircleDollarSign,
 } from "lucide-react";
 
-interface MenuItem {
-  label: string;
-  href?: string;
-  description?: string;
-  icon?: React.ReactNode;
-  badge?: string;
+interface MenuSection {
+  title: string;
+  items: {
+    label: string;
+    href?: string;
+    description?: string;
+    badge?: string;
+  }[];
 }
 
 interface MenuCategory {
   title: string;
-  items: MenuItem[];
+  sections?: MenuSection[];
+  items?: {
+    label: string;
+    href?: string;
+    description?: string;
+    badge?: string;
+  }[];
+  highlight?: {
+    title: string;
+    description: string;
+    href: string;
+    icon: React.ReactNode;
+  };
 }
 
 export function Header() {
@@ -66,180 +85,99 @@ export function Header() {
   }, []);
 
   const menuCategories: Record<string, MenuCategory> = {
-    products: {
-      title: "Produits",
-      items: [
+    comptePro: {
+      title: "Compte pro",
+      sections: [
         {
-          label: "Compte pro",
-          description: "Compte bancaire pour professionnels",
-          icon: <Building2 className="w-5 h-5" />,
-          href: `/${locale}/compte-pro`,
-          badge: "Populaire",
+          title: "Compte et cartes",
+          items: [
+            {
+              label: "Compte pro 100% en ligne",
+              href: `/${locale}/compte-pro`,
+              badge: "Populaire",
+            },
+            { label: "Cartes de débit et crédit", href: `/${locale}/cartes` },
+            { label: "Rémunération de comptes", href: `/${locale}/remuneration` },
+            { label: "Agrégation de comptes", href: `/${locale}/aggregation` },
+          ],
         },
         {
-          label: "Compte personnel",
-          description: "Gestion quotidienne de vos finances",
-          icon: <Users className="w-5 h-5" />,
-          href: `/${locale}/compte-particulier`,
+          title: "Outils",
+          items: [
+            { label: "Pré-comptabilité", href: `/${locale}/precomptabilite` },
+            { label: "Facturation électronique", href: `/${locale}/facturation-electronique` },
+          ],
         },
         {
-          label: "Carte Mastercard",
-          description: "Carte physique et virtuelle",
-          icon: <CreditCard className="w-5 h-5" />,
-          href: `/${locale}/cartes`,
+          title: "Recevoir de l'argent",
+          items: [
+            { label: "Tap to Pay", href: `/${locale}/tap-to-pay` },
+            { label: "Terminaux de paiement", href: `/${locale}/tpe` },
+            { label: "Liens de paiement", href: `/${locale}/liens-paiement` },
+          ],
         },
         {
-          label: "Épargne",
-          description: "Livret et placements",
-          icon: <PiggyBank className="w-5 h-5" />,
-          href: `/${locale}/epargne`,
-        },
-        {
-          label: "Crédit pro",
-          description: "Financement pour votre activité",
-          icon: <Wallet className="w-5 h-5" />,
-          href: `/${locale}/credit`,
-        },
-      ],
-    },
-    features: {
-      title: "Fonctionnalités",
-      items: [
-        {
-          label: "Application mobile",
-          description: "Banque dans votre poche",
-          icon: <Smartphone className="w-5 h-5" />,
-          href: `/${locale}/application`,
-        },
-        {
-          label: "Paiements",
-          description: "Virements et prélèvements",
-          icon: <TrendingUp className="w-5 h-5" />,
-          href: `/${locale}/paiements`,
-        },
-        {
-          label: "Facturation",
-          description: "Créez et envoyez vos factures",
-          icon: <FileText className="w-5 h-5" />,
-          href: `/${locale}/facturation`,
-        },
-        {
-          label: "Comptabilité",
-          description: "Sync avec votre expert-comptable",
-          icon: <Receipt className="w-5 h-5" />,
-          href: `/${locale}/comptabilite`,
-        },
-        {
-          label: "Outils pratiques",
-          description: "Calculateurs et simulateurs",
-          icon: <Calculator className="w-5 h-5" />,
-          href: `/${locale}/outils`,
-        },
-        {
-          label: "Sécurité",
-          description: "Protection de vos fonds",
-          icon: <Shield className="w-5 h-5" />,
-          href: `/${locale}/securite`,
+          title: "Effectuer des paiements",
+          items: [
+            { label: "Virements et prélèvements", href: `/${locale}/virements` },
+            { label: "Virements SWIFT", href: `/${locale}/swift` },
+          ],
         },
       ],
     },
-    pricing: {
+    ressources: {
+      title: "Ressources",
+      sections: [
+        {
+          title: "Nos outils et guides",
+          items: [
+            { label: "Comparateur de comptes pro", href: `/${locale}/comparateur` },
+            { label: "Blog", href: `/${locale}/blog` },
+            { label: "Glossaire financier", href: `/${locale}/glossaire` },
+          ],
+        },
+        {
+          title: "Facturation électronique",
+          items: [
+            {
+              label: "Facturation électronique",
+              href: `/${locale}/facturation-electronique`,
+              description: "Plateforme Agréée Aether Bank",
+            },
+          ],
+        },
+      ],
+      highlight: {
+        title: "Création d'entreprise",
+        description: "Ouvrez votre entreprise en ligne",
+        href: `/${locale}/creation-entreprise`,
+        icon: <Landmark className="w-5 h-5" />,
+      },
+    },
+    financements: {
+      title: "Financements",
+      items: [
+        { label: "Crédit professionnel", href: `/${locale}/credit-professionnel` },
+        { label: "Financement participatif", href: `/${locale}/financement` },
+        { label: "Affacturage", href: `/${locale}/affacturage` },
+      ],
+    },
+    tarifs: {
       title: "Tarifs",
       items: [
-        {
-          label: "Indépendants",
-          description: "Pour freelance et auto-entrepreneur",
-          icon: <Users className="w-5 h-5" />,
-          href: `/${locale}/tarifs-independants`,
-        },
-        {
-          label: "TPE / PME",
-          description: "Pour les petites et moyennes entreprises",
-          icon: <Building2 className="w-5 h-5" />,
-          href: `/${locale}/tarifs-tpe-pme`,
-        },
-        {
-          label: "Associations",
-          description: "Pour les associations loi 1901",
-          icon: <Globe className="w-5 h-5" />,
-          href: `/${locale}/tarifs-associations`,
-        },
-        {
-          label: "Créateurs",
-          description: "Pour créer votre entreprise",
-          icon: <Sparkles className="w-5 h-5" />,
-          href: `/${locale}/tarifs-creation`,
-        },
-        {
-          label: "Tous les tarifs",
-          description: "Voir l'ensemble des offres",
-          icon: <FileText className="w-5 h-5" />,
-          href: `/${locale}/tarifs`,
-        },
+        { label: "Tarifs indépendants", href: `/${locale}/tarifs-independants` },
+        { label: "Tarifs TPE/PME", href: `/${locale}/tarifs-tpe-pme` },
+        { label: "Tarifs associations", href: `/${locale}/tarifs-associations` },
+        { label: "Tous les tarifs", href: `/${locale}/tarifs` },
       ],
     },
-    resources: {
-      title: "Ressources",
+    pourquoi: {
+      title: "Pourquoi Aether Bank",
       items: [
-        {
-          label: "Centre d'aide",
-          description: "FAQ et guides pratiques",
-          icon: <HeadphonesIcon className="w-5 h-5" />,
-          href: `/${locale}/aide`,
-        },
-        {
-          label: "Blog",
-          description: "Actualités et conseils",
-          icon: <FileText className="w-5 h-5" />,
-          href: `/${locale}/blog`,
-        },
-        {
-          label: "Glossaire",
-          description: "Définitions financières",
-          icon: <BookOpen className="w-5 h-5" />,
-          href: `/${locale}/glossaire`,
-        },
-        {
-          label: "Presse",
-          description: "Communiqués et médias",
-          icon: <Newspaper className="w-5 h-5" />,
-          href: `/${locale}/presse`,
-        },
-      ],
-    },
-    enterprise: {
-      title: "Entreprise",
-      items: [
-        {
-          label: "API & Développeurs",
-          description: "Intégrez Aether Bank",
-          icon: <Globe className="w-5 h-5" />,
-          href: `/${locale}/api`,
-        },
-        {
-          label: "Partenariats",
-          description: "Devenir partenaire",
-          icon: <Handshake className="w-5 h-5" />,
-          href: `/${locale}/partenaires`,
-        },
-        {
-          label: "À propos",
-          description: "Notre histoire et valeurs",
-          icon: <Building2 className="w-5 h-5" />,
-          href: `/${locale}/a-propos`,
-        },
-        {
-          label: "Carrières",
-          description: "Rejoignez-nous",
-          icon: <Users className="w-5 h-5" />,
-          href: `/${locale}/jobs`,
-        },
-        {
-          label: "Contact",
-          description: "Nous écrire",
-          icon: <Mail className="w-5 h-5" />,
-          href: `/${locale}/contact`,
-        },
+        { label: "Sécurité", href: `/${locale}/securite` },
+        { label: "Support client", href: `/${locale}/support` },
+        { label: "Notre histoire", href: `/${locale}/a-propos` },
+        { label: "Carrières", href: `/${locale}/jobs` },
       ],
     },
   };
@@ -265,8 +203,8 @@ export function Header() {
             <span className="text-black font-bold text-lg tracking-tight">Aether Bank</span>
           </Link>
 
-          {/* Desktop Navigation with Dropdowns - Centered */}
-          <div className="hidden lg:flex items-center justify-center flex-1 px-4">
+          {/* Desktop Navigation with Mega Menu */}
+          <div className="hidden xl:flex items-center justify-center flex-1 px-4">
             <div className="flex items-center space-x-0.5">
               {Object.entries(menuCategories).map(([key, category]) => (
                 <div key={key} className="relative">
@@ -284,34 +222,87 @@ export function Header() {
                     />
                   </button>
 
-                  {/* Dropdown Menu */}
-                  {openDropdown === key && (
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                  {/* Mega Menu */}
+                  {openDropdown === key && category.sections && (
+                    <div className="absolute top-full left-0 mt-2 w-max min-w-[800px] bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="grid grid-cols-4 gap-6 p-6">
+                        {category.sections.map((section, idx) => (
+                          <div key={idx}>
+                            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                              {section.title}
+                            </h4>
+                            <ul className="space-y-2">
+                              {section.items.map((item, itemIdx) => (
+                                <li key={itemIdx}>
+                                  <Link
+                                    href={item.href || "#"}
+                                    className="flex items-center gap-2 group"
+                                    onClick={() => setOpenDropdown(null)}
+                                  >
+                                    <span className="text-sm text-gray-700 group-hover:text-indigo-600 transition-colors">
+                                      {item.label}
+                                    </span>
+                                    {item.badge && (
+                                      <span className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-100 text-indigo-600 rounded-full">
+                                        {item.badge}
+                                      </span>
+                                    )}
+                                    {item.description && (
+                                      <span className="text-xs text-gray-400 block">
+                                        {item.description}
+                                      </span>
+                                    )}
+                                  </Link>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                      {category.highlight && (
+                        <div className="px-6 pb-6">
+                          <Link
+                            href={category.highlight.href}
+                            className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 hover:border-indigo-200 transition-colors"
+                            onClick={() => setOpenDropdown(null)}
+                          >
+                            <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600">
+                              {category.highlight.icon}
+                            </div>
+                            <div className="flex-1">
+                              <div className="font-semibold text-gray-900 text-sm">
+                                {category.highlight.title}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {category.highlight.description}
+                              </div>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-indigo-400" />
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Simple Dropdown for items without sections */}
+                  {openDropdown === key && !category.sections && category.items && (
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                       <div className="p-2">
                         {category.items.map((item, idx) => (
                           <Link
                             key={idx}
                             href={item.href || "#"}
-                            className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group"
+                            className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors group"
                             onClick={() => setOpenDropdown(null)}
                           >
-                            <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
-                              {item.icon}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium text-gray-900 text-sm">
-                                  {item.label}
-                                </span>
-                                {item.badge && (
-                                  <span className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-100 text-indigo-600 rounded-full">
-                                    {item.badge}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-gray-500 truncate">{item.description}</p>
-                            </div>
-                            <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-indigo-500 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
+                            <span className="text-sm text-gray-700 group-hover:text-indigo-600">
+                              {item.label}
+                            </span>
+                            {item.badge && (
+                              <span className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-100 text-indigo-600 rounded-full">
+                                {item.badge}
+                              </span>
+                            )}
                           </Link>
                         ))}
                       </div>
@@ -366,35 +357,46 @@ export function Header() {
         {isMobileMenuOpen && (
           <div className="lg:hidden bg-white border-t border-gray-100 max-h-[calc(100vh-4rem)] overflow-y-auto">
             <div className="px-4 py-6 space-y-4">
-              {/* Mobile Navigation Items */}
+              {/* Mobile Navigation - Simplified */}
               {Object.entries(menuCategories).map(([key, category]) => (
                 <div key={key} className="space-y-2">
                   <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-2">
                     {category.title}
                   </div>
-                  {category.items.map((item, idx) => (
-                    <Link
-                      key={idx}
-                      href={item.href || "#"}
-                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600">
-                        {item.icon}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
+                  {category.sections &&
+                    category.sections.flatMap((section, sIdx) =>
+                      section.items.map((item, iIdx) => (
+                        <Link
+                          key={`${sIdx}-${iIdx}`}
+                          href={item.href || "#"}
+                          className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
                           <span className="font-medium text-gray-900 text-sm">{item.label}</span>
                           {item.badge && (
                             <span className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-100 text-indigo-600 rounded-full">
                               {item.badge}
                             </span>
                           )}
-                        </div>
-                        <p className="text-xs text-gray-500">{item.description}</p>
-                      </div>
-                    </Link>
-                  ))}
+                        </Link>
+                      ))
+                    )}
+                  {category.items &&
+                    category.items.map((item, idx) => (
+                      <Link
+                        key={idx}
+                        href={item.href || "#"}
+                        className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <span className="font-medium text-gray-900 text-sm">{item.label}</span>
+                        {item.badge && (
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-100 text-indigo-600 rounded-full">
+                            {item.badge}
+                          </span>
+                        )}
+                      </Link>
+                    ))}
                 </div>
               ))}
 
@@ -436,88 +438,5 @@ export function Header() {
         )}
       </nav>
     </header>
-  );
-}
-
-function BookOpen({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-    </svg>
-  );
-}
-
-function Newspaper({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-4 0V6" />
-      <path d="M10 6h8" />
-      <path d="M10 10h8" />
-      <path d="M10 14h4" />
-    </svg>
-  );
-}
-
-function Handshake({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
-      <path d="M12 16v-4" />
-      <path d="M12 8h.01" />
-    </svg>
-  );
-}
-
-function Mail({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <rect width="20" height="16" x="2" y="4" rx="2" />
-      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-    </svg>
   );
 }
