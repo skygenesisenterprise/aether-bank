@@ -69,7 +69,7 @@ export default function LoginPage() {
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         <Image
           src="/images/auth-bg.jpg"
-          alt="The Etheria Times"
+          alt="Aether Bank"
           fill
           priority
           className="object-cover"
@@ -79,7 +79,7 @@ export default function LoginPage() {
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           <Link href="/" className="block">
             <span className="font-serif text-2xl font-bold text-white tracking-tight">
-              The Etheria Times
+              Aether Bank
             </span>
           </Link>
 
@@ -87,10 +87,10 @@ export default function LoginPage() {
             <div className="w-12 h-0.5 bg-primary" />
             <blockquote className="text-white">
               <p className="font-serif text-2xl font-medium leading-relaxed text-pretty">
-                &ldquo;L&apos;information au service du citoyen, aujourd&apos;hui et demain.&rdquo;
+                &ldquo;Le service banciare au service du citoyen, aujourd&apos;hui et demain.&rdquo;
               </p>
               <footer className="mt-4 text-sm text-white/60 font-sans">
-                — La rédaction de The Etheria Times
+                — L'équipe de Aether Bank par Sky Genesis Enterprise
               </footer>
             </blockquote>
           </div>

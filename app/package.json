@@ -1,7 +1,7 @@
 {
-  "name": "@website/app",
+  "name": "@aether-bank/app",
   "version": "1.0.0",
-  "description": "Frontend application for Etheria Times Website",
+  "description": "Frontend application for Aether Bank, a decentralized finance (DeFi) platform built on the Ethereum blockchain. This application provides users with an intuitive interface to access Aether Bank's suite of financial services, including lending, borrowing, and yield farming. The frontend is designed to be secure, efficient, and user-friendly, allowing users to manage their digital assets and participate in the DeFi ecosystem seamlessly.",
   "private": true,
   "type": "module",
   "scripts": {

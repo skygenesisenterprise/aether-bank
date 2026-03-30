@@ -104,7 +104,7 @@ export default function RegisterPage() {
       <div className="hidden lg:flex lg:w-5/12 relative overflow-hidden">
         <Image
           src="/images/auth-bg.jpg"
-          alt="The Etheria Times"
+          alt="Aether Bank"
           fill
           priority
           className="object-cover"
@@ -114,7 +114,7 @@ export default function RegisterPage() {
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           <Link href="/">
             <span className="font-serif text-2xl font-bold text-white tracking-tight">
-              The Etheria Times
+              Aether Bank
             </span>
           </Link>
 
@@ -123,10 +123,10 @@ export default function RegisterPage() {
             <div className="w-12 h-0.5 bg-primary" />
             <blockquote className="text-white">
               <p className="font-serif text-2xl font-medium leading-relaxed text-pretty">
-                &ldquo;L&apos;information au service du citoyen, aujourd&apos;hui et demain.&rdquo;
+                &ldquo;Le service banciare au service du citoyen, aujourd&apos;hui et demain.&rdquo;
               </p>
               <footer className="mt-4 text-sm text-white/60 font-sans">
-                — La rédaction de The Etheria Times
+                — L'équipe de Aether Bank par Sky Genesis Enterprise
               </footer>
             </blockquote>
           </div>
@@ -152,7 +152,7 @@ export default function RegisterPage() {
               Créer un compte
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Rejoignez des milliers de lecteurs et accédez à l&apos;information sans frontières.
+              Rejoignez des milliers de clients et accédez à des services bancaires innovants, sécurisés et adaptés à vos besoins.
             </p>
           </div>
 
@@ -161,10 +161,10 @@ export default function RegisterPage() {
             <div className="w-12 h-0.5 bg-primary" />
             <blockquote className="text-foreground">
               <p className="font-serif text-xl font-medium leading-relaxed text-pretty">
-                &ldquo;L&apos;information au service du citoyen, aujourd&apos;hui et demain.&rdquo;
+                &ldquo;Le service banciare au service du citoyen, aujourd&apos;hui et demain.&rdquo;
               </p>
               <footer className="mt-3 text-sm text-muted-foreground font-sans">
-                — La rédaction de The Etheria Times
+                — L'équipe de Aether Bank par Sky Genesis Enterprise
               </footer>
             </blockquote>
           </div>
@@ -351,7 +351,7 @@ export default function RegisterPage() {
                   htmlFor="newsletter"
                   className="text-sm text-muted-foreground leading-relaxed cursor-pointer"
                 >
-                  Recevoir les newsletters et offres de The Etheria Times.
+                  Recevoir les newsletters et offres d'Aether Bank.
                 </Label>
               </div>
             </div>

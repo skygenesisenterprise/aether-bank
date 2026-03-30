@@ -1,10 +1,10 @@
 services:
-  etheriatimes:
+  aetherbank:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    image: etheriatimes:latest
-    container_name: etheriatimes
+    image: aetherbank:latest
+    container_name: aetherbank
     restart: unless-stopped
     ports:
       - "3000:3000"

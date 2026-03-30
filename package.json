@@ -1,7 +1,7 @@
 {
-  "name": "website",
+  "name": "aether-bank",
   "version": "1.0.0",
-  "description": "The Etheria Times daily news website",
+  "description": "The Aether Bank is a decentralized finance (DeFi) platform built on the Ethereum blockchain. It offers a suite of financial services, including lending, borrowing, and yield farming, all powered by smart contracts. The Aether Bank aims to provide users with a secure and efficient way to manage their digital assets while earning interest and participating in the DeFi ecosystem.",
   "private": true,
   "type": "module",
   "workspaces": [

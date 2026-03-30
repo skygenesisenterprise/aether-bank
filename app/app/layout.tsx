@@ -18,27 +18,17 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | The Etheria Times",
-    default: "The Etheria Times - Actualités en direct et info en continu",
+    template: "%s | Aether Bank",
+    default: "Aether Bank - La banque de demain, disponible dès aujourd'hui",
   },
   description:
-    "Toute l'actualité en direct, les news et infos en continu : politique, économie, société, culture, sport et international sur The Etheria Times.",
+    "Ouvrez votre compte bancaire chez Aether Bank. Carte gratuite, épargne avantageuse, application mobile et sécurité maximale. Banking the future, today.",
   icons: {
     icon: [
       {
-        url: "/etheriatimes.png",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        url: "/etheriatimes.png",
-        media: "(prefers-color-scheme: dark)",
-      },
-      {
-        url: "/etheriatimes.png",
-        type: "image/svg+xml",
+        url: "/favicon.ico",
       },
     ],
-    apple: "/apple-icon.png",
   },
 };
 
@@ -51,7 +41,7 @@ export default function RootLayout({
     <html suppressHydrationWarning>
       <body
         suppressHydrationWarning
-        className={`${inter.variable} ${sourceSerif.variable} font-sans antialiased`}
+        className={`${inter.variable} ${sourceSerif.variable} font-sans antialiased bg-white text-black`}
       >
         <Providers>{children}</Providers>
         <Analytics />
