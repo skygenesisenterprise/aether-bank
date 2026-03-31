@@ -495,7 +495,7 @@ export function Footer() {
               {/* Logo & Copyright */}
               <div className="flex flex-col md:flex-row items-center gap-4">
                 <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-lg bg-linear-to-br from-indigo-600 to-purple-600 flex items-center justify-center">
                     <span className="text-white font-bold">A</span>
                   </div>
                   <span className="text-white font-semibold">Aether Bank</span>
