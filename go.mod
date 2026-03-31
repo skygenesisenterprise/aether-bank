@@ -1,4 +1,4 @@
-module github.com/etheriatimes/website
+module github.com/skygenesisenterprise/aether-bank
 
 go 1.25.5
 

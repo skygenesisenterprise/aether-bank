@@ -18,7 +18,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/etheriatimes/website/server/src/models"
+	"github.com/skygenesisenterprise/aether-bank/server/src/models"
 )
 
 func ParseEmail(rawEmail string) (*models.Email, error) {

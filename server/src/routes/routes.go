@@ -9,10 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/etheriatimes/website/server/src/middleware"
-	"github.com/etheriatimes/website/server/src/models"
-	"github.com/etheriatimes/website/server/src/services"
 	"github.com/gin-gonic/gin"
+	"github.com/skygenesisenterprise/aether-bank/server/src/domain"
+	"github.com/skygenesisenterprise/aether-bank/server/src/middleware"
+	"github.com/skygenesisenterprise/aether-bank/server/src/models"
+	"github.com/skygenesisenterprise/aether-bank/server/src/services"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -358,6 +359,123 @@ func SetupRoutes(router *gin.Engine, jwtService *services.JWTService) {
 			docker.POST("/exec", dockerHandler.ExecCommand)
 			docker.GET("/status", dockerHandler.GetStatus)
 			docker.GET("/containers", dockerHandler.ListContainers)
+		}
+
+		// ==================== BANKING API ====================
+		bankingHandler := NewBankingHandler()
+		accounts := api.Group("/accounts")
+		{
+			accounts.POST("", bankingHandler.CreateAccount)
+			accounts.GET("", bankingHandler.ListAccounts)
+			accounts.GET("/:id", bankingHandler.GetAccount)
+			accounts.GET("/:id/balance", bankingHandler.GetAccountBalance)
+		}
+		cards := api.Group("/cards")
+		{
+			cards.POST("", bankingHandler.CreateCard)
+			cards.GET("", bankingHandler.ListCards)
+			cards.GET("/:id", bankingHandler.GetCard)
+			cards.POST("/:id/freeze", bankingHandler.FreezeCard)
+			cards.POST("/:id/unfreeze", bankingHandler.UnfreezeCard)
+		}
+		transfers := api.Group("/transfers")
+		{
+			transfers.POST("", bankingHandler.CreateTransfer)
+			transfers.GET("", bankingHandler.ListTransfers)
+			transfers.GET("/:id", bankingHandler.GetTransfer)
+		}
+		transactions := api.Group("/transactions")
+		{
+			transactions.GET("", bankingHandler.ListTransactions)
+			transactions.GET("/search", bankingHandler.SearchTransactions)
+			transactions.GET("/export", bankingHandler.ExportTransactions)
+			transactions.GET("/:id", bankingHandler.GetTransaction)
+		}
+		ledger := api.Group("/ledger")
+		{
+			ledger.GET("/entries", bankingHandler.GetLedgerEntries)
+			ledger.GET("/entries/:id", bankingHandler.GetLedgerEntry)
+			ledger.GET("/accounts", bankingHandler.GetLedgerAccounts)
+			ledger.GET("/accounts/:code/entries", bankingHandler.GetLedgerAccountEntries)
+			ledger.GET("/balance", bankingHandler.GetLedgerBalance)
+			ledger.POST("/export/fec", bankingHandler.ExportFEC)
+		}
+		directDebits := api.Group("/direct-debits")
+		{
+			directDebits.POST("/mandates", bankingHandler.CreateMandate)
+			directDebits.GET("/mandates", bankingHandler.ListMandates)
+			directDebits.GET("/mandates/:id", bankingHandler.GetMandate)
+			directDebits.POST("/mandates/:id/cancel", bankingHandler.CancelMandate)
+			directDebits.POST("", bankingHandler.CreateDirectDebit)
+			directDebits.GET("", bankingHandler.ListDirectDebits)
+			directDebits.GET("/:id", bankingHandler.GetDirectDebit)
+		}
+		clients := api.Group("/clients")
+		{
+			clients.POST("", bankingHandler.CreateClient)
+			clients.GET("", bankingHandler.ListClients)
+			clients.GET("/:id", bankingHandler.GetClient)
+		}
+		credits := api.Group("/credits")
+		{
+			credits.POST("", bankingHandler.CreateCredit)
+			credits.GET("", bankingHandler.ListCredits)
+			credits.GET("/:id", bankingHandler.GetCredit)
+		}
+		savings := api.Group("/savings")
+		{
+			savings.POST("/accounts", bankingHandler.CreateSavingsAccount)
+			savings.GET("/accounts", bankingHandler.ListSavingsAccounts)
+			savings.GET("/accounts/:id", bankingHandler.GetSavingsAccount)
+		}
+
+		// ==================== IBAN / BIC MANAGEMENT ====================
+		ibanHandler := NewIBANHandler()
+		iban := api.Group("/iban")
+		{
+			iban.POST("/validate", ibanHandler.ValidateIBAN)
+			iban.POST("/parse", ibanHandler.ParseIBAN)
+			iban.POST("/generate", ibanHandler.GenerateIBAN)
+			iban.GET("/bic/:iban", ibanHandler.GetBICFromIBAN)
+		}
+
+		// ==================== WEBHOOKS (External Providers) ====================
+		webhookHandler := NewWebhookHandler()
+		webhooks := api.Group("/webhooks")
+		{
+			webhooks.POST("/iban", webhookHandler.HandleIBANWebhook)
+			webhooks.POST("/payment", webhookHandler.HandlePaymentWebhook)
+			webhooks.POST("/card", webhookHandler.HandleCardWebhook)
+			webhooks.POST("/kyc", webhookHandler.HandleKYCWebhook)
+		}
+
+		// ==================== KYC ====================
+		kycHandler := NewKYCHandler()
+		kyc := api.Group("/kyc")
+		{
+			kyc.POST("/verify", kycHandler.VerifyIdentity)
+			kyc.GET("/status/:id", kycHandler.GetVerificationStatus)
+		}
+
+		// ==================== NEW TRANSFERS ====================
+		transferHandler := NewTransferHandler()
+		newTransfers := api.Group("/transfers-v2")
+		{
+			newTransfers.POST("", transferHandler.CreateTransfer)
+			newTransfers.GET("", transferHandler.ListTransfers)
+			newTransfers.GET("/:id", transferHandler.GetTransfer)
+			newTransfers.POST("/:id/reverse", transferHandler.ReverseTransfer)
+		}
+
+		// ==================== NEW LEDGER ====================
+		ledgerHandler := NewLedgerHandler()
+		newLedger := api.Group("/ledger-v2")
+		{
+			newLedger.POST("/accounts", ledgerHandler.CreateAccount)
+			newLedger.GET("/accounts", ledgerHandler.ListAccounts)
+			newLedger.GET("/accounts/:id", ledgerHandler.GetAccount)
+			newLedger.GET("/accounts/:id/balance", ledgerHandler.GetBalance)
+			newLedger.GET("/accounts/:id/entries", ledgerHandler.GetLedgerEntries)
 		}
 	}
 }
@@ -2779,4 +2897,705 @@ func splitLines(s string) []string {
 		}
 	}
 	return lines
+}
+
+// ==================== BANKING HANDLERS ====================
+
+var bankingService *services.BankingService
+
+func init() {
+	bankingService = services.NewBankingService()
+}
+
+type BankingHandler struct{}
+
+func NewBankingHandler() *BankingHandler {
+	return &BankingHandler{}
+}
+
+func (h *BankingHandler) CreateAccount(c *gin.Context) {
+	var req models.CreateBankingAccountRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.BankingAccountResponse{Success: false, Error: "Invalid request: " + err.Error()})
+		return
+	}
+	account := bankingService.CreateAccount(&req)
+	c.JSON(http.StatusCreated, models.BankingAccountResponse{Success: true, Data: account})
+}
+
+func (h *BankingHandler) GetAccount(c *gin.Context) {
+	id := c.Param("id")
+	account := bankingService.GetAccount(id)
+	if account == nil {
+		c.JSON(http.StatusNotFound, models.BankingAccountResponse{Success: false, Error: "Account not found"})
+		return
+	}
+	c.JSON(http.StatusOK, models.BankingAccountResponse{Success: true, Data: account})
+}
+
+func (h *BankingHandler) ListAccounts(c *gin.Context) {
+	status := c.Query("status")
+	accountType := c.Query("type")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	accounts := bankingService.ListAccounts(status, accountType, limit, offset)
+	c.JSON(http.StatusOK, models.BankingAccountListResponse{Success: true, Data: accounts})
+}
+
+func (h *BankingHandler) GetAccountBalance(c *gin.Context) {
+	id := c.Param("id")
+	balance := bankingService.GetBalance(id)
+	if balance == nil {
+		c.JSON(http.StatusNotFound, models.BalanceResponse{Success: false, Error: "Account not found"})
+		return
+	}
+	c.JSON(http.StatusOK, models.BalanceResponse{Success: true, Data: balance})
+}
+
+func (h *BankingHandler) CreateCard(c *gin.Context) {
+	var req models.CreateCardRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.CardResponse{Success: false, Error: "Invalid request: " + err.Error()})
+		return
+	}
+	card := bankingService.CreateCard(&req)
+	c.JSON(http.StatusCreated, models.CardResponse{Success: true, Data: card})
+}
+
+func (h *BankingHandler) GetCard(c *gin.Context) {
+	id := c.Param("id")
+	card := bankingService.GetCard(id)
+	if card == nil {
+		c.JSON(http.StatusNotFound, models.CardResponse{Success: false, Error: "Card not found"})
+		return
+	}
+	c.JSON(http.StatusOK, models.CardResponse{Success: true, Data: card})
+}
+
+func (h *BankingHandler) ListCards(c *gin.Context) {
+	accountID := c.Query("account_id")
+	status := c.Query("status")
+	cardType := c.Query("type")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	cards := bankingService.ListCards(accountID, status, cardType, limit, offset)
+	c.JSON(http.StatusOK, models.CardListResponse{Success: true, Data: cards})
+}
+
+func (h *BankingHandler) FreezeCard(c *gin.Context) {
+	id := c.Param("id")
+	var req models.FreezeCardRequest
+	c.ShouldBindJSON(&req)
+	card := bankingService.FreezeCard(id, req.Reason)
+	if card == nil {
+		c.JSON(http.StatusNotFound, models.CardResponse{Success: false, Error: "Card not found"})
+		return
+	}
+	c.JSON(http.StatusOK, models.CardResponse{Success: true, Data: card})
+}
+
+func (h *BankingHandler) UnfreezeCard(c *gin.Context) {
+	id := c.Param("id")
+	card := bankingService.UnfreezeCard(id)
+	if card == nil {
+		c.JSON(http.StatusNotFound, models.CardResponse{Success: false, Error: "Card not found"})
+		return
+	}
+	c.JSON(http.StatusOK, models.CardResponse{Success: true, Data: card})
+}
+
+func (h *BankingHandler) CreateTransfer(c *gin.Context) {
+	var req models.CreateTransferRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.TransferResponse{Success: false, Error: "Invalid request: " + err.Error()})
+		return
+	}
+	transfer := bankingService.CreateTransfer(&req)
+	c.JSON(http.StatusCreated, models.TransferResponse{Success: true, Data: transfer})
+}
+
+func (h *BankingHandler) GetTransfer(c *gin.Context) {
+	id := c.Param("id")
+	transfer := bankingService.GetTransfer(id)
+	if transfer == nil {
+		c.JSON(http.StatusNotFound, models.TransferResponse{Success: false, Error: "Transfer not found"})
+		return
+	}
+	c.JSON(http.StatusOK, models.TransferResponse{Success: true, Data: transfer})
+}
+
+func (h *BankingHandler) ListTransfers(c *gin.Context) {
+	accountID := c.Query("account_id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	transfers := bankingService.ListTransfers(accountID, limit, offset)
+	c.JSON(http.StatusOK, models.TransferListResponse{Success: true, Data: transfers})
+}
+
+func (h *BankingHandler) GetTransaction(c *gin.Context) {
+	id := c.Param("id")
+	transaction := bankingService.GetTransaction(id)
+	if transaction == nil {
+		c.JSON(http.StatusNotFound, models.TransactionResponse{Success: false, Error: "Transaction not found"})
+		return
+	}
+	c.JSON(http.StatusOK, models.TransactionResponse{Success: true, Data: transaction})
+}
+
+func (h *BankingHandler) ListTransactions(c *gin.Context) {
+	req := models.TransactionSearchRequest{
+		AccountID: c.Query("account_id"),
+		Status:    c.Query("status"),
+		Type:      c.Query("type"),
+		From:      c.Query("from"),
+		To:        c.Query("to"),
+		Query:     c.Query("q"),
+	}
+	req.Limit, _ = strconv.Atoi(c.DefaultQuery("limit", "50"))
+	req.Offset, _ = strconv.Atoi(c.DefaultQuery("offset", "0"))
+	txns := bankingService.ListTransactions(&req)
+	c.JSON(http.StatusOK, models.TransactionListResponse{Success: true, Data: txns})
+}
+
+func (h *BankingHandler) SearchTransactions(c *gin.Context) {
+	req := models.TransactionSearchRequest{
+		AccountID: c.Query("account_id"),
+		Query:     c.Query("q"),
+	}
+	req.Limit, _ = strconv.Atoi(c.DefaultQuery("limit", "50"))
+	req.Offset, _ = strconv.Atoi(c.DefaultQuery("offset", "0"))
+	txns := bankingService.ListTransactions(&req)
+	c.JSON(http.StatusOK, models.TransactionListResponse{Success: true, Data: txns})
+}
+
+func (h *BankingHandler) ExportTransactions(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Export functionality - returns CSV/JSON/PDF"})
+}
+
+func (h *BankingHandler) GetLedgerEntries(c *gin.Context) {
+	accountID := c.Query("account_id")
+	fromDate := c.Query("from_date")
+	toDate := c.Query("to_date")
+	category := c.Query("category")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	entries := bankingService.GetLedgerEntries(accountID, fromDate, toDate, category, limit, offset)
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: entries})
+}
+
+func (h *BankingHandler) GetLedgerEntry(c *gin.Context) {
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: nil})
+}
+
+func (h *BankingHandler) GetLedgerAccounts(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	accounts := bankingService.GetLedgerAccounts(limit, offset)
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: accounts})
+}
+
+func (h *BankingHandler) GetLedgerAccountEntries(c *gin.Context) {
+	code := c.Param("code")
+	c.JSON(http.StatusOK, models.LedgerResponse{
+		Success: true,
+		Data: gin.H{
+			"account": gin.H{"code": code, "label": "Account " + code, "type": "general"},
+			"entries": []models.LedgerEntry{},
+			"totals":  gin.H{"total_debit": 0, "total_credit": 0, "solde": 0},
+		},
+	})
+}
+
+func (h *BankingHandler) GetLedgerBalance(c *gin.Context) {
+	date := c.DefaultQuery("date", "2026-03-31")
+	balance := bankingService.GetLedgerBalance(date)
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: balance})
+}
+
+func (h *BankingHandler) ExportFEC(c *gin.Context) {
+	var req models.ExportFECRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		req.FromDate = c.Query("from")
+		req.ToDate = c.Query("to")
+		req.Format = c.DefaultQuery("format", "fec")
+	}
+	export := bankingService.ExportFEC(&req)
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: export})
+}
+
+func (h *BankingHandler) CreateMandate(c *gin.Context) {
+	var req models.CreateMandateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.MandateResponse{Success: false, Error: "Invalid request: " + err.Error()})
+		return
+	}
+	mandate := bankingService.CreateMandate(&req)
+	c.JSON(http.StatusCreated, models.MandateResponse{Success: true, Data: mandate})
+}
+
+func (h *BankingHandler) GetMandate(c *gin.Context) {
+	id := c.Param("id")
+	mandate := bankingService.GetMandate(id)
+	if mandate == nil {
+		c.JSON(http.StatusNotFound, models.MandateResponse{Success: false, Error: "Mandate not found"})
+		return
+	}
+	c.JSON(http.StatusOK, models.MandateResponse{Success: true, Data: mandate})
+}
+
+func (h *BankingHandler) ListMandates(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	mandates := bankingService.ListMandates(limit, offset)
+	c.JSON(http.StatusOK, models.MandateListResponse{Success: true, Data: mandates})
+}
+
+func (h *BankingHandler) CancelMandate(c *gin.Context) {
+	id := c.Param("id")
+	mandate := bankingService.CancelMandate(id)
+	if mandate == nil {
+		c.JSON(http.StatusNotFound, models.MandateResponse{Success: false, Error: "Mandate not found"})
+		return
+	}
+	c.JSON(http.StatusOK, models.MandateResponse{Success: true, Data: mandate})
+}
+
+func (h *BankingHandler) CreateDirectDebit(c *gin.Context) {
+	var req models.CreateDirectDebitRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.DirectDebitResponse{Success: false, Error: "Invalid request: " + err.Error()})
+		return
+	}
+	dd := bankingService.CreateDirectDebit(&req)
+	c.JSON(http.StatusCreated, models.DirectDebitResponse{Success: true, Data: dd})
+}
+
+func (h *BankingHandler) GetDirectDebit(c *gin.Context) {
+	id := c.Param("id")
+	dd := bankingService.GetDirectDebit(id)
+	if dd == nil {
+		c.JSON(http.StatusNotFound, models.DirectDebitResponse{Success: false, Error: "Direct debit not found"})
+		return
+	}
+	c.JSON(http.StatusOK, models.DirectDebitResponse{Success: true, Data: dd})
+}
+
+func (h *BankingHandler) ListDirectDebits(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	ddList := bankingService.ListDirectDebits(limit, offset)
+	c.JSON(http.StatusOK, models.DirectDebitListResponse{Success: true, Data: ddList})
+}
+
+func (h *BankingHandler) CreateClient(c *gin.Context) {
+	var req models.CreateClientRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ClientResponse{Success: false, Error: "Invalid request: " + err.Error()})
+		return
+	}
+	client := bankingService.CreateClient(&req)
+	c.JSON(http.StatusCreated, models.ClientResponse{Success: true, Data: client})
+}
+
+func (h *BankingHandler) GetClient(c *gin.Context) {
+	id := c.Param("id")
+	client := bankingService.GetClient(id)
+	if client == nil {
+		c.JSON(http.StatusNotFound, models.ClientResponse{Success: false, Error: "Client not found"})
+		return
+	}
+	c.JSON(http.StatusOK, models.ClientResponse{Success: true, Data: client})
+}
+
+func (h *BankingHandler) ListClients(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	clients := bankingService.ListClients(limit, offset)
+	c.JSON(http.StatusOK, models.ClientListResponse{Success: true, Data: clients})
+}
+
+func (h *BankingHandler) CreateCredit(c *gin.Context) {
+	var req models.CreateCreditRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.CreditResponse{Success: false, Error: "Invalid request: " + err.Error()})
+		return
+	}
+	credit := bankingService.CreateCredit(&req)
+	c.JSON(http.StatusCreated, models.CreditResponse{Success: true, Data: credit})
+}
+
+func (h *BankingHandler) GetCredit(c *gin.Context) {
+	id := c.Param("id")
+	credit := bankingService.GetCredit(id)
+	if credit == nil {
+		c.JSON(http.StatusNotFound, models.CreditResponse{Success: false, Error: "Credit not found"})
+		return
+	}
+	c.JSON(http.StatusOK, models.CreditResponse{Success: true, Data: credit})
+}
+
+func (h *BankingHandler) ListCredits(c *gin.Context) {
+	accountID := c.Query("account_id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	credits := bankingService.ListCredits(accountID, limit, offset)
+	c.JSON(http.StatusOK, models.CreditListResponse{Success: true, Data: credits})
+}
+
+func (h *BankingHandler) CreateSavingsAccount(c *gin.Context) {
+	var req models.CreateSavingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.SavingsResponse{Success: false, Error: "Invalid request: " + err.Error()})
+		return
+	}
+	account := bankingService.CreateSavingsAccount(&req)
+	c.JSON(http.StatusCreated, models.SavingsResponse{Success: true, Data: account})
+}
+
+func (h *BankingHandler) GetSavingsAccount(c *gin.Context) {
+	id := c.Param("id")
+	account := bankingService.GetSavingsAccount(id)
+	if account == nil {
+		c.JSON(http.StatusNotFound, models.SavingsResponse{Success: false, Error: "Savings account not found"})
+		return
+	}
+	c.JSON(http.StatusOK, models.SavingsResponse{Success: true, Data: account})
+}
+
+func (h *BankingHandler) ListSavingsAccounts(c *gin.Context) {
+	accountID := c.Query("account_id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	accounts := bankingService.ListSavingsAccounts(accountID, limit, offset)
+	c.JSON(http.StatusOK, models.SavingsListResponse{Success: true, Data: accounts})
+}
+
+// ==================== WEBHOOK HANDLERS ====================
+
+type WebhookHandler struct{}
+
+func NewWebhookHandler() *WebhookHandler {
+	return &WebhookHandler{}
+}
+
+func (h *WebhookHandler) HandleIBANWebhook(c *gin.Context) {
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true})
+}
+
+func (h *WebhookHandler) HandlePaymentWebhook(c *gin.Context) {
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true})
+}
+
+func (h *WebhookHandler) HandleCardWebhook(c *gin.Context) {
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true})
+}
+
+func (h *WebhookHandler) HandleKYCWebhook(c *gin.Context) {
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true})
+}
+
+// ==================== KYC HANDLERS ====================
+
+type KYCHandler struct{}
+
+func NewKYCHandler() *KYCHandler {
+	return &KYCHandler{}
+}
+
+func (h *KYCHandler) VerifyIdentity(c *gin.Context) {
+	var req struct {
+		UserID       string `json:"user_id"`
+		DocumentType string `json:"document_type"`
+		DocumentID   string `json:"document_id"`
+		FirstName    string `json:"first_name"`
+		LastName     string `json:"last_name"`
+		DateOfBirth  string `json:"date_of_birth"`
+		Nationality  string `json:"nationality"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.LedgerResponse{Success: false, Error: "Invalid request"})
+		return
+	}
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true})
+}
+
+func (h *KYCHandler) GetVerificationStatus(c *gin.Context) {
+	id := c.Param("id")
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: map[string]string{"id": id, "status": "approved"}})
+}
+
+// ==================== IBAN HANDLERS ====================
+
+type IBANHandler struct{}
+
+func NewIBANHandler() *IBANHandler {
+	return &IBANHandler{}
+}
+
+func (h *IBANHandler) ValidateIBAN(c *gin.Context) {
+	var req struct {
+		IBAN string `json:"iban" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.LedgerResponse{Success: false, Error: "Invalid request"})
+		return
+	}
+
+	details := services.ParseIBAN(req.IBAN)
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: details})
+}
+
+func (h *IBANHandler) ParseIBAN(c *gin.Context) {
+	var req struct {
+		IBAN string `json:"iban" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.LedgerResponse{Success: false, Error: "Invalid request"})
+		return
+	}
+
+	details := services.ParseIBAN(req.IBAN)
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: details})
+}
+
+func (h *IBANHandler) GenerateIBAN(c *gin.Context) {
+	var req struct {
+		CountryCode   string `json:"country_code"`
+		BankCode      string `json:"bank_code"`
+		BranchCode    string `json:"branch_code"`
+		AccountNumber string `json:"account_number"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.LedgerResponse{Success: false, Error: "Invalid request"})
+		return
+	}
+
+	if req.CountryCode == "" {
+		req.CountryCode = "FR"
+	}
+	if req.BankCode == "" {
+		req.BankCode = "30002"
+	}
+	if req.BranchCode == "" {
+		req.BranchCode = "00005"
+	}
+	if req.AccountNumber == "" {
+		req.AccountNumber = "00001234567"
+	}
+
+	iban := services.GenerateIBAN(req.CountryCode, req.BankCode, req.BranchCode, req.AccountNumber)
+	bic := services.GenerateBIC(req.BankCode, req.CountryCode, req.BranchCode)
+
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: map[string]string{
+		"iban": iban,
+		"bic":  bic,
+	}})
+}
+
+func (h *IBANHandler) GetBICFromIBAN(c *gin.Context) {
+	iban := c.Param("iban")
+	if iban == "" {
+		c.JSON(http.StatusBadRequest, models.LedgerResponse{Success: false, Error: "IBAN required"})
+		return
+	}
+
+	bic := services.ExtractBICFromIBAN(iban)
+	if bic == "" {
+		c.JSON(http.StatusBadRequest, models.LedgerResponse{Success: false, Error: "Invalid IBAN"})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: map[string]string{"bic": bic}})
+}
+
+// ==================== TRANSFER HANDLERS ====================
+
+type TransferHandler struct{}
+
+func NewTransferHandler() *TransferHandler {
+	return &TransferHandler{}
+}
+
+func (h *TransferHandler) CreateTransfer(c *gin.Context) {
+	var req struct {
+		AccountID        string `json:"account_id" binding:"required"`
+		Amount           int64  `json:"amount" binding:"required,gt=0"`
+		Currency         string `json:"currency"`
+		Description      string `json:"description"`
+		Reference        string `json:"reference"`
+		IBAN             string `json:"iban" binding:"required"`
+		BIC              string `json:"bic" binding:"required"`
+		CounterpartyName string `json:"counterparty_name"`
+		IdempotencyKey   string `json:"idempotency_key"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.LedgerResponse{Success: false, Error: "Invalid request: " + err.Error()})
+		return
+	}
+
+	transferSvc := services.GetTransferService()
+
+	counterparty := &domain.Counterparty{
+		Name: req.CounterpartyName,
+		IBAN: req.IBAN,
+		BIC:  req.BIC,
+	}
+
+	domainReq := &domain.TransferRequest{
+		AccountID:      req.AccountID,
+		Amount:         req.Amount,
+		Currency:       req.Currency,
+		Description:    req.Description,
+		Reference:      req.Reference,
+		Counterparty:   counterparty,
+		IBAN:           req.IBAN,
+		BIC:            req.BIC,
+		IdempotencyKey: req.IdempotencyKey,
+	}
+
+	transfer, err := transferSvc.CreateOutgoingTransfer(c.Request.Context(), domainReq)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.LedgerResponse{Success: false, Error: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, models.LedgerResponse{Success: true, Data: transfer})
+}
+
+func (h *TransferHandler) GetTransfer(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, models.LedgerResponse{Success: false, Error: "Transfer ID required"})
+		return
+	}
+
+	transferSvc := services.GetTransferService()
+	transfer, err := transferSvc.GetTransfer(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.LedgerResponse{Success: false, Error: "Transfer not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: transfer})
+}
+
+func (h *TransferHandler) ListTransfers(c *gin.Context) {
+	accountID := c.Query("account_id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
+	transferSvc := services.GetTransferService()
+	transfers := transferSvc.ListTransfers(c.Request.Context(), accountID, limit, offset)
+
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: transfers})
+}
+
+func (h *TransferHandler) ReverseTransfer(c *gin.Context) {
+	id := c.Param("id")
+	var req struct {
+		Reason string `json:"reason" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.LedgerResponse{Success: false, Error: "Reason required"})
+		return
+	}
+
+	transferSvc := services.GetTransferService()
+	transfer, err := transferSvc.ReverseTransfer(c.Request.Context(), id, req.Reason)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.LedgerResponse{Success: false, Error: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: transfer})
+}
+
+// ==================== LEDGER HANDLERS ====================
+
+type LedgerHandler struct{}
+
+func NewLedgerHandler() *LedgerHandler {
+	return &LedgerHandler{}
+}
+
+func (h *LedgerHandler) CreateAccount(c *gin.Context) {
+	var req struct {
+		UserID      string `json:"user_id" binding:"required"`
+		AccountType string `json:"account_type"`
+		Currency    string `json:"currency"`
+		HolderName  string `json:"holder_name"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.LedgerResponse{Success: false, Error: "Invalid request"})
+		return
+	}
+
+	accountType := "current"
+	if req.AccountType != "" {
+		accountType = req.AccountType
+	}
+	currency := "EUR"
+	if req.Currency != "" {
+		currency = req.Currency
+	}
+	holderName := req.HolderName
+	if holderName == "" {
+		holderName = "Account Holder"
+	}
+
+	transferSvc := services.GetTransferService()
+	account, err := transferSvc.CreateAccount(c.Request.Context(), req.UserID, accountType, currency, holderName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.LedgerResponse{Success: false, Error: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, models.LedgerResponse{Success: true, Data: account})
+}
+
+func (h *LedgerHandler) GetAccount(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, models.LedgerResponse{Success: false, Error: "Account ID required"})
+		return
+	}
+
+	transferSvc := services.GetTransferService()
+	account, err := transferSvc.GetAccount(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.LedgerResponse{Success: false, Error: "Account not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: account})
+}
+
+func (h *LedgerHandler) ListAccounts(c *gin.Context) {
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: []interface{}{}})
+}
+
+func (h *LedgerHandler) GetBalance(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, models.LedgerResponse{Success: false, Error: "Account ID required"})
+		return
+	}
+
+	transferSvc := services.GetTransferService()
+	balance, err := transferSvc.GetBalance(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.LedgerResponse{Success: false, Error: "Account not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: map[string]int64{"balance": balance}})
+}
+
+func (h *LedgerHandler) GetLedgerEntries(c *gin.Context) {
+	accountID := c.Param("id")
+
+	transferSvc := services.GetTransferService()
+	entries := transferSvc.GetLedgerEntries(c.Request.Context(), accountID)
+
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: entries})
 }

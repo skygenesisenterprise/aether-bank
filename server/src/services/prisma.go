@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/etheriatimes/website/server/src/config"
-	"github.com/etheriatimes/website/server/src/models"
+	"github.com/skygenesisenterprise/aether-bank/server/src/config"
+	"github.com/skygenesisenterprise/aether-bank/server/src/models"
 	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -354,9 +354,10 @@ func (p *PrismaService) CreateUser(email, firstName, lastName, role, password st
 	id := fmt.Sprintf("user_%d", time.Now().UnixNano())
 	now := time.Now()
 	defaultRole := models.RoleUser
-	if role == "ADMIN" {
+	switch role {
+	case "ADMIN":
 		defaultRole = models.RoleAdmin
-	} else if role == "EDITOR" {
+	case "EDITOR":
 		defaultRole = models.RoleEditor
 	}
 
