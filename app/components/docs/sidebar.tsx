@@ -31,7 +31,6 @@ import {
   FileCheck,
   CreditCard as CardIcon,
   ShieldCheck,
-  Code,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -72,7 +71,6 @@ const navigation = [
       { title: "Providers", href: "/docs/platform/providers", icon: Building2 },
       { title: "Encryption", href: "/docs/platform/encryption", icon: Lock },
       { title: "Cloud", href: "/docs/platform/cloud", icon: Cloud },
-      { title: "API", href: "/docs/platform/api", icon: Code },
       { title: "Compliance", href: "/docs/platform/compliance", icon: Scale },
       { title: "Security", href: "/docs/platform/security", icon: ShieldCheck },
       { title: "Notifications", href: "/docs/platform/notifications", icon: Bell },
