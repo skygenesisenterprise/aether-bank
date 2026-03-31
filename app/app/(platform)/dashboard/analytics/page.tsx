@@ -8,10 +8,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   DollarSign,
-  Users,
-  CreditCard,
   Wallet,
-  ArrowLeftRight,
   BarChart3,
   Activity,
   Calendar,
@@ -38,7 +35,6 @@ import {
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
