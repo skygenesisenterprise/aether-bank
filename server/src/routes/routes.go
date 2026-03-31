@@ -457,6 +457,16 @@ func SetupRoutes(router *gin.Engine, jwtService *services.JWTService) {
 			kyc.GET("/status/:id", kycHandler.GetVerificationStatus)
 		}
 
+		// ==================== WALLET (Apple Pay / Google Wallet) ====================
+		walletHandler := NewWalletHandler()
+		wallet := api.Group("/wallet")
+		{
+			wallet.POST("/apple/generate-pass", walletHandler.GenerateApplePayPass)
+			wallet.POST("/google/generate-pass", walletHandler.GenerateGoogleWalletPass)
+			wallet.POST("/google/create-add-link", walletHandler.CreateGoogleAddToWalletLink)
+			wallet.GET("/status/:cardId", walletHandler.GetWalletPassStatus)
+		}
+
 		// ==================== NEW TRANSFERS ====================
 		transferHandler := NewTransferHandler()
 		newTransfers := api.Group("/transfers-v2")
@@ -3598,4 +3608,109 @@ func (h *LedgerHandler) GetLedgerEntries(c *gin.Context) {
 	entries := transferSvc.GetLedgerEntries(c.Request.Context(), accountID)
 
 	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: entries})
+}
+
+// ==================== WALLET HANDLERS ====================
+
+type WalletHandler struct{}
+
+func NewWalletHandler() *WalletHandler {
+	return &WalletHandler{}
+}
+
+type ApplePayPassRequest struct {
+	CardID      string `json:"card_id" binding:"required"`
+	CardNumber  string `json:"card_number" binding:"required"`
+	HolderName  string `json:"holder_name" binding:"required"`
+	ExpiryMonth string `json:"expiry_month" binding:"required"`
+	ExpiryYear  string `json:"expiry_year" binding:"required"`
+}
+
+func (h *WalletHandler) GenerateApplePayPass(c *gin.Context) {
+	var req ApplePayPassRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.LedgerResponse{Success: false, Error: "Invalid request: " + err.Error()})
+		return
+	}
+
+	walletService := services.NewWalletPassService(
+		"merchant.aetherbank.com",
+		"AetherBank",
+		"pass.com.aetherbank.card",
+	)
+
+	passData, err := walletService.GenerateApplePayPass(
+		req.CardID,
+		req.CardNumber,
+		req.HolderName,
+		req.ExpiryMonth,
+		req.ExpiryYear,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.LedgerResponse{Success: false, Error: "Failed to generate pass: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: map[string]any{
+		"pass_type":         "apple_pay",
+		"pass_data":         string(passData),
+		"add_to_wallet_url": fmt.Sprintf("https://wallet.aetherbank.com/api/v1/wallet/apple/add?card_id=%s", req.CardID),
+	}})
+}
+
+type GoogleWalletPassRequest struct {
+	CardID      string `json:"card_id" binding:"required"`
+	CardNumber  string `json:"card_number" binding:"required"`
+	HolderName  string `json:"holder_name" binding:"required"`
+	ExpiryMonth string `json:"expiry_month"`
+	ExpiryYear  string `json:"expiry_year"`
+}
+
+func (h *WalletHandler) GenerateGoogleWalletPass(c *gin.Context) {
+	var req GoogleWalletPassRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.LedgerResponse{Success: false, Error: "Invalid request: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: map[string]any{
+		"pass_type":     "google_wallet",
+		"issuer_id":     "AetherBank",
+		"class_id":      "aetherbank.card",
+		"instance_id":   req.CardID,
+		"barcode_value": req.CardNumber,
+	}})
+}
+
+func (h *WalletHandler) CreateGoogleAddToWalletLink(c *gin.Context) {
+	var req GoogleWalletPassRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.LedgerResponse{Success: false, Error: "Invalid request"})
+		return
+	}
+
+	walletService := services.NewGoogleWalletService("AetherBank", "service@aetherbank.com", nil)
+
+	class := walletService.CreatePassClass("default")
+	object := walletService.CreatePassObject(class.ClassID, req.CardID, req.CardNumber, req.HolderName)
+
+	link, err := walletService.CreateAddToWalletLink(object)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.LedgerResponse{Success: false, Error: "Failed to create link"})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: map[string]string{
+		"add_to_wallet_url": link,
+	}})
+}
+
+func (h *WalletHandler) GetWalletPassStatus(c *gin.Context) {
+	cardID := c.Param("cardId")
+
+	c.JSON(http.StatusOK, models.LedgerResponse{Success: true, Data: map[string]any{
+		"card_id":       cardID,
+		"apple_pay":     true,
+		"google_wallet": true,
+	}})
 }

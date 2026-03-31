@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -581,4 +582,513 @@ model FooterLink {
 
   @@index([locale])
   @@index([category])
+}
+
+// =====================================================
+// AETHER BANK MODELS
+// =====================================================
+
+// --- Enums for Banking ---
+
+enum BankAccountType {
+  CURRENT
+  SAVINGS
+  BUSINESS
+  JOINT
+}
+
+enum BankAccountStatus {
+  PENDING_KYC
+  ACTIVE
+  RESTRICTED
+  CLOSED
+  BLOCKED
+}
+
+enum CardType {
+  PHYSICAL
+  VIRTUAL
+}
+
+enum CardStatus {
+  PENDING
+  ACTIVE
+  FROZEN
+  BLOCKED
+  EXPIRED
+  CANCELLED
+}
+
+enum TransferType {
+  SEPA
+  INTERNATIONAL
+  INTERNAL
+}
+
+enum TransferDirection {
+  DEBIT
+  CREDIT
+}
+
+enum TransferStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REVERSED
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+  CARD
+  DIRECT_DEBIT
+  FEE
+  REFUND
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REVERSED
+}
+
+enum DirectDebitStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+enum CreditStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  DEFAULTED
+  CANCELLED
+}
+
+enum SavingsStatus {
+  PENDING
+  ACTIVE
+  CLOSED
+}
+
+enum KYCStatus {
+  PENDING
+  REVIEW
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum WalletPassType {
+  APPLE_PAY
+  GOOGLE_WALLET
+}
+
+enum LedgerEntryStatus {
+  PENDING
+  VALIDATED
+  RECONCILED
+}
+
+enum ClientStatus {
+  PROSPECT
+  ACTIVE
+  INACTIVE
+}
+
+// --- Bank Account ---
+
+model BankAccount {
+  id          String           @id @default(cuid())
+  userId      String?
+  accountType BankAccountType @default(CURRENT)
+  status      BankAccountStatus @default(PENDING_KYC)
+  currency    String           @default("EUR")
+  iban        String           @unique
+  bic         String
+  holderName  String
+  holderType  String           @default("individual")
+  balance     BigInt           @default(0)
+  available   BigInt           @default(0)
+  pending     BigInt           @default(0)
+  overdraft   BigInt           @default(0)
+  providerRef String?
+  metadata    Json?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  cards          BankingCard[]
+  transfers      Transfer[]
+  transactions   Transaction[]
+  ledgerEntries  LedgerEntry[]
+  credits        Credit[]
+  savings        SavingsAccount[]
+  mandates       Mandate[]
+  walletPasses  WalletPass[]
+  client        Client?           @relation(fields: [clientId], references: [id])
+  clientId       String?
+
+  @@index([userId])
+  @@index([status])
+  @@index([iban])
+}
+
+// --- Banking Card ---
+
+model BankingCard {
+  id              String      @id @default(cuid())
+  accountId      String
+  account        BankAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  cardType       CardType    @default(VIRTUAL)
+  status         CardStatus  @default(PENDING)
+  holderName     String
+  pan            String?
+  last4          String
+  expiryMonth    Int
+  expiryYear     Int
+  cvv            String?
+  brand          String      @default("VISA")
+  dailyLimit     BigInt       @default(100000)
+  monthlyLimit   BigInt       @default(300000)
+  providerRef    String?
+  frozenAt       DateTime?
+  frozenReason   String?
+  estimatedDelivery DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  authorizations CardAuthorization[]
+  walletPasses   WalletPass[]
+
+  @@index([accountId])
+  @@index([status])
+}
+
+// --- Transfer ---
+
+model Transfer {
+  id            String            @id @default(cuid())
+  accountId    String
+  account      BankAccount       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  type         TransferType       @default(SEPA)
+  direction    TransferDirection
+  amount       BigInt
+  currency     String             @default("EUR")
+  status       TransferStatus     @default(PENDING)
+  description  String?
+  reference    String?
+  iban         String?
+  bic          String?
+  counterpartyName String?
+  counterpartyIban String?
+  externalRef  String?
+  providerRef  String?
+  fees         BigInt              @default(0)
+  idempotencyKey String?
+  metadata     Json?
+  executedAt   DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([accountId])
+  @@index([status])
+  @@index([reference])
+  @@index([externalRef])
+  @@index([idempotencyKey])
+}
+
+// --- Transaction ---
+
+model Transaction {
+  id            String             @id @default(cuid())
+  accountId     String
+  account       BankAccount        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  type          TransactionType
+  status        TransactionStatus   @default(PENDING)
+  amount        BigInt
+  currency      String              @default("EUR")
+  description   String?
+  reference     String?
+  balanceAfter  BigInt?
+  counterpartyName String?
+  counterpartyIban String?
+  merchantName  String?
+  merchantCategory String?
+  reconciled    Boolean             @default(false)
+  metadata      Json?
+  createdAt     DateTime            @default(now())
+  completedAt   DateTime?
+
+  @@index([accountId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// --- Ledger Entry ---
+
+model LedgerEntry {
+  id            String              @id @default(cuid())
+  accountId     String
+  account       BankAccount         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  amount        BigInt
+  currency      String              @default("EUR")
+  direction     TransferDirection
+  description   String?
+  reference     String?
+  ledgerRef    String?
+  status        LedgerEntryStatus   @default(PENDING)
+  transactionId String?
+  createdAt    DateTime            @default(now())
+  validatedAt  DateTime?
+
+  @@index([accountId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// --- Credit ---
+
+model Credit {
+  id               String        @id @default(cuid())
+  accountId       String
+  account         BankAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  amount          BigInt
+  currency        String        @default("EUR")
+  interestRate    Float
+  termMonths      Int
+  monthlyPayment  BigInt
+  status          CreditStatus  @default(PENDING)
+  collateral      String?
+  remainingAmount BigInt
+  remainingMonths Int
+  startDate       DateTime
+  endDate         DateTime
+  metadata        Json?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([accountId])
+  @@index([status])
+}
+
+// --- Savings Account ---
+
+model SavingsAccount {
+  id               String         @id @default(cuid())
+  accountId        String
+  account          BankAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  currency         String         @default("EUR")
+  status           SavingsStatus  @default(PENDING)
+  interestRate     Float
+  balance          BigInt          @default(0)
+  accruedInterest  BigInt           @default(0)
+  totalCredits     BigInt          @default(0)
+  totalDebits      BigInt          @default(0)
+  metadata         Json?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([accountId])
+  @@index([status])
+}
+
+// --- Mandate (SEPA Direct Debit) ---
+
+model Mandate {
+  id            String            @id @default(cuid())
+  accountId    String
+  account      BankAccount       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  type         String            @default("RECURRENT")
+  rum          String            @unique
+  status       DirectDebitStatus @default(PENDING)
+  creditorName String
+  creditorIban String
+  creditorBic  String?
+  reference    String?
+  signedAt     DateTime?
+  validFrom    DateTime?
+  validTo      DateTime?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  directDebits DirectDebit[]
+
+  @@index([accountId])
+  @@index([status])
+  @@index([rum])
+}
+
+// --- Direct Debit ---
+
+model DirectDebit {
+  id          String            @id @default(cuid())
+  mandateId   String
+  mandate    Mandate           @relation(fields: [mandateId], references: [id], onDelete: Cascade)
+  amount      BigInt
+  currency    String            @default("EUR")
+  status      DirectDebitStatus @default(PENDING)
+  description String?
+  scheduledDate DateTime?
+  executedDate  DateTime?
+  returnCode   String?
+  createdAt   DateTime          @default(now())
+
+  @@index([mandateId])
+  @@index([status])
+  @@index([scheduledDate])
+}
+
+// --- KYC Verification ---
+
+model KYCVerification {
+  id            String     @id @default(cuid())
+  userId        String
+  documentType  String
+  documentId    String?
+  firstName     String
+  lastName      String
+  dateOfBirth   String?
+  nationality   String?
+  status        KYCStatus  @default(PENDING)
+  providerRef   String?
+  riskScore     Int        @default(0)
+  checks        Json?
+  verifiedAt    DateTime?
+  expiresAt     DateTime?
+  metadata      Json?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// --- Card Authorization ---
+
+model CardAuthorization {
+  id            String    @id @default(cuid())
+  cardId        String
+  card          BankingCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  amount        BigInt
+  currency      String    @default("EUR")
+  merchantId    String?
+  merchantName  String?
+  mcc           String?
+  reference     String?
+  status        String    @default("pending")
+  responseCode  String?
+  createdAt     DateTime  @default(now())
+  completedAt   DateTime?
+
+  @@index([cardId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// --- Client ---
+
+model Client {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String
+  company      String?
+  status       ClientStatus @default(PROSPECT)
+  kycVerified  Boolean      @default(false)
+  metadata     Json?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  bankAccounts BankAccount[]
+
+  @@index([status])
+  @@index([kycVerified])
+}
+
+// --- Wallet Pass ---
+
+model WalletPass {
+  id          String         @id @default(cuid())
+  cardId      String
+  card        BankingCard    @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  accountId   String
+  account     BankAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  passType    WalletPassType
+  providerRef String?
+  passData    Json?
+  addedAt     DateTime      @default(now())
+  lastSync    DateTime?
+  status      String        @default("active")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([cardId])
+  @@index([accountId])
+  @@index([passType])
+  @@index([status])
+}
+
+// --- Ledger Account (for accounting) ---
+
+model LedgerAccount {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  label     String
+  type      String
+  parentId  String?
+  parent    LedgerAccount? @relation("LedgerAccountHierarchy", fields: [parentId], references: [id])
+  children  LedgerAccount[] @relation("LedgerAccountHierarchy")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentId])
+  @@index([code])
+}
+
+// --- External Provider Integration ---
+
+model ProviderIntegration {
+  id          String   @id @default(cuid())
+  provider    String
+  type        String
+  name        String
+  config      Json?
+  status      String   @default("active")
+  credentials Json?
+  sandboxMode Boolean  @default(true)
+  lastSyncAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([provider, type])
+  @@index([provider])
+  @@index([status])
+}
+
+// --- Webhook Event ---
+
+model WebhookEvent {
+  id          String   @id @default(cuid())
+  type        String
+  provider    String
+  payload     Json
+  signature   String?
+  processed   Boolean  @default(false)
+  attempts    Int      @default(0)
+  lastError   String?
+  processedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([type])
+  @@index([provider])
+  @@index([processed])
+  @@index([createdAt])
 }
