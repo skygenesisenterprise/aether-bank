@@ -32,34 +32,34 @@ const navigation = [
   {
     title: "Overview",
     items: [
-      { name: "Dashboard", href: "/platform/dashboard", icon: LayoutDashboard },
-      { name: "Analytics", href: "/platform/analytics", icon: BarChart3 },
+      { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
     ],
   },
   {
     title: "Gestion",
     items: [
-      { name: "Clients", href: "/platform/clients", icon: Users },
-      { name: "Transactions", href: "/platform/transactions", icon: ArrowLeftRight },
-      { name: "Comptes", href: "/platform/accounts", icon: Wallet },
-      { name: "Cartes", href: "/platform/cards", icon: CreditCard },
-      { name: "Facturation", href: "/platform/invoices", icon: FileText },
+      { name: "Clients", href: "/dashboard/clients", icon: Users },
+      { name: "Transactions", href: "/dashboard/transactions", icon: ArrowLeftRight },
+      { name: "Comptes", href: "/dashboard/accounts", icon: Wallet },
+      { name: "Cartes", href: "/dashboard/cards", icon: CreditCard },
+      { name: "Facturation", href: "/dashboard/invoices", icon: FileText },
     ],
   },
   {
     title: "Finance",
     items: [
-      { name: "Épargne", href: "/platform/savings", icon: PiggyBank },
-      { name: "Crédit", href: "/platform/credits", icon: TrendingUp },
-      { name: "Prélèvements", href: "/platform/direct-debits", icon: Receipt },
+      { name: "Épargne", href: "/dashboard/savings", icon: PiggyBank },
+      { name: "Crédit", href: "/dashboard/credits", icon: TrendingUp },
+      { name: "Prélèvements", href: "/dashboard/direct-debits", icon: Receipt },
     ],
   },
   {
     title: "Services",
     items: [
-      { name: "IBAN & SWIFT", href: "/platform/iban", icon: Globe },
-      { name: "API & Intégrations", href: "/platform/api", icon: Code2 },
-      { name: "Notifications", href: "/platform/notifications", icon: Bell },
+      { name: "IBAN & SWIFT", href: "/dashboard/iban", icon: Globe },
+      { name: "API & Intégrations", href: "/dashboard/api", icon: Code2 },
+      { name: "Notifications", href: "/dashboard/notifications", icon: Bell },
     ],
   },
 ];
@@ -68,24 +68,24 @@ const secondaryNavigation = [
   {
     title: "Sécurité",
     items: [
-      { name: "Sécurité", href: "/platform/security", icon: Shield },
-      { name: "Conformité", href: "/platform/compliance", icon: ShieldCheck },
-      { name: "Chiffrement", href: "/platform/encryption", icon: Lock },
+      { name: "Sécurité", href: "/dashboard/security", icon: Shield },
+      { name: "Conformité", href: "/dashboard/compliance", icon: ShieldCheck },
+      { name: "Chiffrement", href: "/dashboard/encryption", icon: Lock },
     ],
   },
   {
     title: "Infrastructure",
     items: [
-      { name: "Ledger", href: "/platform/ledger", icon: Database },
-      { name: "Providers", href: "/platform/providers", icon: Server },
-      { name: "Cloud", href: "/platform/cloud", icon: Cloud },
+      { name: "Ledger", href: "/dashboard/ledger", icon: Database },
+      { name: "Providers", href: "/dashboard/providers", icon: Server },
+      { name: "Cloud", href: "/dashboard/cloud", icon: Cloud },
     ],
   },
 ];
 
 const bottomNavigation = [
-  { name: "Paramètres", href: "/platform/settings", icon: Settings },
-  { name: "Aide", href: "/platform/help", icon: HelpCircle },
+  { name: "Paramètres", href: "/dashboard/settings", icon: Settings },
+  { name: "Aide", href: "/dashboard/help", icon: HelpCircle },
 ];
 
 export function AdminSidebar() {
