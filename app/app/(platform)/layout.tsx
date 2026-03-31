@@ -1,18 +1,14 @@
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { AdminSidebar } from "@/components/platform/admin-sidebar";
-import { AdminHeader } from "@/components/platform/admin-header";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AdminSidebar } from "@/components/platform/sidebar";
+import { AdminHeader } from "@/components/platform/header";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function PlatformLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ProtectedRoute>
-      <SidebarProvider>
-        <AdminSidebar />
-        <SidebarInset>
-          <AdminHeader />
-          <main className="flex-1 overflow-auto">{children}</main>
-        </SidebarInset>
-      </SidebarProvider>
-    </ProtectedRoute>
+    <div className="flex h-screen">
+      <AdminSidebar />
+      <div className="flex-1 flex flex-col ml-64">
+        <AdminHeader title="Dashboard" />
+        <main className="flex-1 overflow-auto bg-gray-50">{children}</main>
+      </div>
+    </div>
   );
 }

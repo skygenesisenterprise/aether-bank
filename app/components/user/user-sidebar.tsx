@@ -15,11 +15,6 @@ import {
   PiggyBank,
   Shield,
   Wallet,
-  ArrowUpRight,
-  ArrowDownLeft,
-  DollarSign,
-  Bell,
-  Search,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -32,7 +27,7 @@ const sidebarItems = [
   },
   {
     title: "Comptes",
-    href: "/user/accounts",
+    href: "/user/account",
     icon: Landmark,
   },
   {
@@ -98,7 +93,7 @@ export function UserSidebar() {
       {/* Logo */}
       <div className="h-16 flex items-center px-6 border-b border-gray-100">
         <Link href="/user/home" className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-linear-to-br from-indigo-600 to-purple-600 flex items-center justify-center">
             <span className="text-white font-bold text-sm">A</span>
           </div>
           <span className="font-bold text-gray-900">Aether Bank</span>
@@ -159,7 +154,7 @@ export function UserSidebar() {
       {/* User Profile */}
       <div className="p-4 border-t border-gray-100">
         <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold">
+          <div className="w-10 h-10 rounded-full bg-linear-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold">
             JD
           </div>
           <div className="flex-1 min-w-0">
