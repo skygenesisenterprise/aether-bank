@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Building2, Plus, Search, ArrowRight, CheckCircle, Shield, Globe } from "lucide-react";
+import { Building2, Plus, Search, ArrowRight, Shield, Globe } from "lucide-react";
 
 const providerTypes = [
   {

@@ -1,7 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Lock, Key, Shield, Server, ArrowRight, CheckCircle, Eye } from "lucide-react";
+import { Lock, Key, Shield, Server, CheckCircle, Eye } from "lucide-react";
 
 const encryptionTypes = [
   {

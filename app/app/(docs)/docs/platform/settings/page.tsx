@@ -8,7 +8,6 @@ import {
   Bell,
   Globe,
   ArrowRight,
-  CheckCircle,
 } from "lucide-react";
 
 const settingsSections = [

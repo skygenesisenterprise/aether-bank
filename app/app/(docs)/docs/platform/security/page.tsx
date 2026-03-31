@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Shield, Lock, Eye, ArrowRight, CheckCircle, Key, Bell } from "lucide-react";
+import { Shield, Lock, Eye, CheckCircle, Key } from "lucide-react";
 
 const securityFeatures = [
   {

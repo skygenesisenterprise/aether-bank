@@ -8,7 +8,6 @@ import {
   ArrowRight,
   CheckCircle,
   Clock,
-  AlertCircle,
   Download,
   RefreshCw,
 } from "lucide-react";

@@ -8,11 +8,7 @@ import {
   Users,
   BarChart3,
   ArrowRight,
-  CheckCircle,
   Shield,
-  Settings,
-  Globe,
-  Clock,
 } from "lucide-react";
 
 const features = [

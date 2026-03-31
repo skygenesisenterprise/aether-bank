@@ -136,7 +136,7 @@ export default function PlatformAccountsPage() {
                   <td className="px-4 py-3 text-sm">{account.id}</td>
                   <td className="px-4 py-3 text-sm font-medium">{account.name}</td>
                   <td className="px-4 py-3 text-sm">{account.type}</td>
-                  <td className="px-4 py-3 text-sm font-mono text-xs">{account.iban}</td>
+                  <td className="px-4 py-3 'text-sm' font-mono text-xs">{account.iban}</td>
                   <td className="px-4 py-3 text-sm text-right">
                     {account.balance.toLocaleString("fr-FR", {
                       style: "currency",

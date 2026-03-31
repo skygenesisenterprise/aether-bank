@@ -7,7 +7,6 @@ import {
   Search,
   Filter,
   ArrowRight,
-  CheckCircle,
   TrendingUp,
   Clock,
   Percent,

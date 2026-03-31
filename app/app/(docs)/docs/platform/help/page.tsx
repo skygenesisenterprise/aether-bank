@@ -14,7 +14,7 @@ import {
 const supportChannels = [
   {
     title: "Email",
-    description: "support@aether.bank",
+    description: "support@skygenesisenterprise.com",
     icon: Mail,
     availability: "Réponse sous 24h",
   },

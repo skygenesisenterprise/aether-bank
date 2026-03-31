@@ -150,7 +150,7 @@ export default function PlatformDirectDebitsPage() {
                   <td className="px-4 py-3 text-sm text-right">
                     {dd.amount.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}
                   </td>
-                  <td className="px-4 py-3 text-sm font-mono text-xs">{dd.mandate}</td>
+                  <td className="px-4 py-3 'text-sm' font-mono text-xs">{dd.mandate}</td>
                   <td className="px-4 py-3 text-center">
                     <span
                       className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${

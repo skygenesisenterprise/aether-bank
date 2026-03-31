@@ -99,10 +99,10 @@ const navigation = [
   {
     title: "Security",
     items: [
-      { title: "Authentication", href: "/docs/authentication", icon: Lock },
-      { title: "2FA", href: "/docs/2fa", icon: Shield },
-      { title: "Fraud Protection", href: "/docs/fraud", icon: Shield },
-      { title: "API Keys", href: "/docs/api-keys", icon: Key },
+      { title: "Authentication", href: "/docs/security/authentication", icon: Lock },
+      { title: "2FA", href: "/docs/security/2fa", icon: Shield },
+      { title: "Fraud Protection", href: "/docs/security/fraud", icon: Shield },
+      { title: "API Keys", href: "/docs/security/api-keys", icon: Key },
     ],
   },
   {

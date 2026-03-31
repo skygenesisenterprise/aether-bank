@@ -1,7 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Scale, Shield, CheckCircle, ArrowRight, FileText, Globe, Lock } from "lucide-react";
+import { Scale, Shield, CheckCircle, FileText, Globe, Lock } from "lucide-react";
 
 const regulations = [
   {

@@ -7,10 +7,8 @@ import {
   Search,
   Filter,
   ArrowRight,
-  Download,
   Send,
   Clock,
-  CheckCircle,
 } from "lucide-react";
 
 const invoiceStatuses = [
