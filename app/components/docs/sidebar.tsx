@@ -108,9 +108,9 @@ const navigation = [
   {
     title: "Support",
     items: [
-      { title: "FAQ", href: "/docs/faq", icon: HelpCircle },
-      { title: "Contact", href: "/docs/contact", icon: MessageCircle },
-      { title: "Legal", href: "/docs/legal", icon: FileText },
+      { title: "FAQ", href: "/docs/support/faq", icon: HelpCircle },
+      { title: "Contact", href: "/docs/support/contact", icon: MessageCircle },
+      { title: "Legal", href: "/docs/support/legal", icon: FileText },
     ],
   },
 ];
@@ -128,13 +128,6 @@ export function DocsSidebar() {
           </div>
           <span className="font-semibold text-lg">Aether Bank</span>
         </Link>
-      </div>
-
-      {/* Documentation Label */}
-      <div className="px-6 py-3 border-b border-border">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Documentation
-        </span>
       </div>
 
       {/* Navigation */}
