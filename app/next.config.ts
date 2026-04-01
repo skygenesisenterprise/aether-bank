@@ -20,7 +20,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "etheriatimes.com",
+        hostname: "bank.skygenesisenterprise.com",
         pathname: "/**",
       },
       {
