@@ -118,6 +118,8 @@ func (s *BankingService) CreateAccount(req *models.CreateBankingAccountRequest) 
 		req.Currency = "EUR"
 	}
 
+	initialBalance := req.InitialBalance
+
 	account := &models.BankingAccount{
 		ID:       generateBankingID("acc"),
 		Type:     req.Type,
@@ -130,8 +132,8 @@ func (s *BankingService) CreateAccount(req *models.CreateBankingAccountRequest) 
 			Type: req.HolderType,
 		},
 		Balance: &models.AccountBalance{
-			Available: 0,
-			Current:   0,
+			Available: initialBalance,
+			Current:   initialBalance,
 			Pending:   0,
 			Overdraft: 0,
 		},
@@ -139,6 +141,14 @@ func (s *BankingService) CreateAccount(req *models.CreateBankingAccountRequest) 
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
+
+	prisma := GetPrismaService()
+	if prisma != nil {
+		if err := prisma.CreateBankAccount(account); err == nil {
+			return account
+		}
+	}
+
 	bankingAccounts[account.ID] = account
 	return account
 }
@@ -175,10 +185,29 @@ func (s *BankingService) CreateInternalAccount(req *models.CreateBankingAccountR
 }
 
 func (s *BankingService) GetAccount(id string) *models.BankingAccount {
+	prisma := GetPrismaService()
+	if prisma != nil {
+		if acc, err := prisma.GetBankAccount(id); err == nil && acc != nil {
+			return acc
+		}
+	}
 	return bankingAccounts[id]
 }
 
 func (s *BankingService) ListAccounts(status, accountType string, limit, offset int) *models.BankingAccountList {
+	prisma := GetPrismaService()
+	if prisma != nil {
+		accounts, total, err := prisma.ListBankAccounts(status, accountType, limit, offset)
+		if err == nil {
+			return &models.BankingAccountList{
+				Accounts: accounts,
+				Total:    total,
+				Limit:    limit,
+				Offset:   offset,
+			}
+		}
+	}
+
 	var accounts []models.BankingAccount
 	for _, acc := range bankingAccounts {
 		if status != "" && string(acc.Status) != status {
@@ -228,6 +257,7 @@ func (s *BankingService) CreateCard(req *models.CreateCardRequest) *models.Banki
 		Brand:          "VISA",
 		SpendingLimits: req.SpendingLimits,
 		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
 	}
 
 	if req.Type == models.CardTypeVirtual {
@@ -245,15 +275,41 @@ func (s *BankingService) CreateCard(req *models.CreateCardRequest) *models.Banki
 		card.EstimatedDelivery = &delivery
 	}
 
+	prisma := GetPrismaService()
+	if prisma != nil {
+		if err := prisma.CreateBankingCard(card); err == nil {
+			return card
+		}
+	}
+
 	bankingCards[card.ID] = card
 	return card
 }
 
 func (s *BankingService) GetCard(id string) *models.BankingCard {
+	prisma := GetPrismaService()
+	if prisma != nil {
+		if card, err := prisma.GetBankingCard(id); err == nil && card != nil {
+			return card
+		}
+	}
 	return bankingCards[id]
 }
 
 func (s *BankingService) ListCards(accountID, status, cardType string, limit, offset int) *models.CardList {
+	prisma := GetPrismaService()
+	if prisma != nil {
+		cards, total, err := prisma.ListBankingCards(accountID, status, cardType, limit, offset)
+		if err == nil {
+			return &models.CardList{
+				Cards:  cards,
+				Total:  total,
+				Limit:  limit,
+				Offset: offset,
+			}
+		}
+	}
+
 	var cards []models.BankingCard
 	for _, card := range bankingCards {
 		if accountID != "" && card.AccountID != accountID {
@@ -286,6 +342,18 @@ func (s *BankingService) ListCards(accountID, status, cardType string, limit, of
 }
 
 func (s *BankingService) FreezeCard(id, reason string) *models.BankingCard {
+	prisma := GetPrismaService()
+	if prisma != nil {
+		if err := prisma.FreezeBankingCard(id, reason); err == nil {
+			return &models.BankingCard{
+				ID:           id,
+				Status:       models.CardStatusFrozen,
+				FrozenReason: reason,
+				FrozenAt:     func() *time.Time { t := time.Now(); return &t }(),
+			}
+		}
+	}
+
 	card := bankingCards[id]
 	if card != nil {
 		card.Status = models.CardStatusFrozen
@@ -297,6 +365,16 @@ func (s *BankingService) FreezeCard(id, reason string) *models.BankingCard {
 }
 
 func (s *BankingService) UnfreezeCard(id string) *models.BankingCard {
+	prisma := GetPrismaService()
+	if prisma != nil {
+		if err := prisma.UnfreezeBankingCard(id); err == nil {
+			return &models.BankingCard{
+				ID:     id,
+				Status: models.CardStatusActive,
+			}
+		}
+	}
+
 	card := bankingCards[id]
 	if card != nil {
 		card.Status = models.CardStatusActive

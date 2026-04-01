@@ -24,21 +24,25 @@ const (
 )
 
 type Transaction struct {
-	ID           string                 `json:"id"`
-	AccountID    string                 `json:"account_id"`
-	Type         TransactionType        `json:"type"`
-	Status       TransactionStatus      `json:"status"`
-	Amount       int64                  `json:"amount"`
-	Currency     string                 `json:"currency"`
-	Description  string                 `json:"description"`
-	Reference    string                 `json:"reference,omitempty"`
-	BalanceAfter int64                  `json:"balance_after,omitempty"`
-	Counterparty *Counterparty          `json:"counterparty,omitempty"`
-	Merchant     *Merchant              `json:"merchant,omitempty"`
-	Metadata     map[string]interface{} `json:"metadata,omitempty"`
-	Reconciled   bool                   `json:"reconciled"`
-	CreatedAt    time.Time              `json:"created_at"`
-	CompletedAt  *time.Time             `json:"completed_at,omitempty"`
+	ID               string                 `json:"id"`
+	AccountID        string                 `json:"account_id"`
+	Type             TransactionType        `json:"type"`
+	Status           TransactionStatus      `json:"status"`
+	Amount           int64                  `json:"amount"`
+	Currency         string                 `json:"currency"`
+	Description      string                 `json:"description"`
+	Reference        string                 `json:"reference,omitempty"`
+	BalanceAfter     int64                  `json:"balance_after,omitempty"`
+	Counterparty     *Counterparty          `json:"counterparty,omitempty"`
+	CounterpartyName string                 `json:"counterparty_name,omitempty"`
+	CounterpartyIban string                 `json:"counterparty_iban,omitempty"`
+	Merchant         *Merchant              `json:"merchant,omitempty"`
+	MerchantName     string                 `json:"merchant_name,omitempty"`
+	MerchantCategory string                 `json:"merchant_category,omitempty"`
+	Metadata         map[string]interface{} `json:"metadata,omitempty"`
+	Reconciled       bool                   `json:"reconciled"`
+	CreatedAt        time.Time              `json:"created_at"`
+	CompletedAt      *time.Time             `json:"completed_at,omitempty"`
 }
 
 type Merchant struct {

@@ -721,6 +721,7 @@ model BankAccount {
   overdraft   BigInt           @default(0)
   providerRef String?
   metadata    Json?
+  clientId    String?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
@@ -731,13 +732,13 @@ model BankAccount {
   credits        Credit[]
   savings        SavingsAccount[]
   mandates       Mandate[]
-  walletPasses  WalletPass[]
-  client        Client?           @relation(fields: [clientId], references: [id])
-  clientId       String?
+  walletPasses   WalletPass[]
+  client         Client?         @relation(fields: [clientId], references: [id])
 
   @@index([userId])
   @@index([status])
   @@index([iban])
+  @@index([clientId])
 }
 
 // --- Banking Card ---

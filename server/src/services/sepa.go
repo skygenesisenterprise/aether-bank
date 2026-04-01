@@ -180,6 +180,13 @@ func (s *SEPAService) GetBankName(bankCode string) string {
 	return "French Bank"
 }
 
+func (s *SEPAService) GetBankCode(bic string) string {
+	if len(bic) >= 8 {
+		return bic[4:8]
+	}
+	return bic
+}
+
 func (s *SEPAService) ParseIBAN(iban string) *SEPAAccountDetails {
 	details := s.ibanService.ParseIBAN(iban)
 
@@ -270,4 +277,60 @@ func ValidateSEPAData(iban, bic string) (bool, string) {
 func ParseSEPAIBAN(iban string) *SEPAAccountDetails {
 	service := NewSEPAService()
 	return service.ParseIBAN(iban)
+}
+
+type CardDetails struct {
+	PAN         string `json:"pan"`
+	Last4       string `json:"last4"`
+	ExpiryMonth int    `json:"expiry_month"`
+	ExpiryYear  int    `json:"expiry_year"`
+	CVC         string `json:"cvc"`
+	Brand       string `json:"brand"`
+}
+
+func (s *SEPAService) GenerateMastercard(panPrefix string) *CardDetails {
+	if panPrefix == "" {
+		panPrefix = "5229"
+	}
+
+	remainingDigits := 15 - len(panPrefix)
+	accountNumber := panPrefix + generateRandomNumericString(remainingDigits)
+
+	luhnDigit := calculateLuhnCheckDigit(accountNumber)
+	fullPan := accountNumber + fmt.Sprintf("%d", luhnDigit)
+
+	cvc := generateRandomNumericString(3)
+
+	expiryMonth := int(time.Now().Month())
+	expiryYear := time.Now().Year() + 3
+
+	return &CardDetails{
+		PAN:         fullPan,
+		Last4:       fullPan[len(fullPan)-4:],
+		ExpiryMonth: expiryMonth,
+		ExpiryYear:  expiryYear,
+		CVC:         cvc,
+		Brand:       "MASTERCARD",
+	}
+}
+
+func calculateLuhnCheckDigit(number string) int {
+	sum := 0
+	isSecond := true
+
+	for i := len(number) - 1; i >= 0; i-- {
+		d := int(number[i] - '0')
+
+		if isSecond {
+			d *= 2
+			if d > 9 {
+				d -= 9
+			}
+		}
+
+		sum += d
+		isSecond = !isSecond
+	}
+
+	return (10 - (sum % 10)) % 10
 }

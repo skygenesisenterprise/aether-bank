@@ -15,6 +15,8 @@ const getApiBaseUrl = () => {
 };
 
 const API_BASE_URL = getApiBaseUrl();
+const SERVICE_KEY =
+  process.env.NEXT_PUBLIC_SERVICE_KEY || "sk_etheria_public_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6";
 
 interface RequestOptions extends RequestInit {
   params?: Record<string, string>;
@@ -43,6 +45,7 @@ class ApiClient {
       headers: {
         "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` }),
+        ...(SERVICE_KEY && { "X-Service-Key": SERVICE_KEY }),
         ...fetchOptions.headers,
       },
     };
@@ -605,4 +608,210 @@ export const footerLinksApi = {
     apiClient.put<FooterLinksResponse>(`/api/v1/admin/footer-links/${id}`, data),
 
   delete: (id: string) => apiClient.delete<FooterLinksResponse>(`/api/v1/admin/footer-links/${id}`),
+};
+
+// ==================== BANKING API ====================
+
+export interface BankAccountBalance {
+  available: number;
+  current: number;
+  pending: number;
+  overdraft: number;
+}
+
+export interface BankCard {
+  id: string;
+  account_id: string;
+  last4: string;
+  pan?: string;
+  expiry_month: number;
+  expiry_year: number;
+  cvc?: string;
+  card_type: string;
+  brand: string;
+  status: string;
+  holder_name: string;
+}
+
+export interface BankAccount {
+  id: string;
+  account_number?: string;
+  name?: string;
+  type?: string;
+  account_type?: string;
+  owner?: string;
+  owner_type?: string;
+  owner_category?: string;
+  balance: number | BankAccountBalance;
+  available_balance?: number;
+  status: string;
+  currency: string;
+  iban: string;
+  iban_formatted?: string;
+  bic: string;
+  bic_formatted?: string;
+  bank_id?: string;
+  is_valid?: boolean;
+  bank_name?: string;
+  card?: BankCard;
+  holder?: {
+    name: string;
+    type: string;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export function getBalance(account: BankAccount): number {
+  if (typeof account.balance === "number") return account.balance;
+  return account.balance.current;
+}
+
+export function getAvailableBalance(account: BankAccount): number {
+  if (typeof account.balance === "number") return account.balance;
+  return account.balance.available;
+}
+
+export interface BankAccountResponse {
+  success: boolean;
+  data?: BankAccount;
+  error?: string;
+}
+
+export interface BankAccountListResponse {
+  success: boolean;
+  data: BankAccount[];
+  total: number;
+  error?: string;
+}
+
+export interface BalanceResponse {
+  success: boolean;
+  data?: {
+    available: number;
+    current: number;
+    pending: number;
+    overdraft: number;
+  };
+  error?: string;
+}
+
+export interface IBANValidationResponse {
+  success: boolean;
+  data?: {
+    is_valid: boolean;
+    error?: string;
+    iban: string;
+    bic?: string;
+  };
+  error?: string;
+}
+
+export const accountsApi = {
+  list: (params?: { status?: string; type?: string; category?: string; search?: string }) => {
+    const queryParams: Record<string, string> = {};
+    if (params?.status) queryParams.status = params.status;
+    if (params?.type) queryParams.type = params.type;
+    if (params?.category) queryParams.category = params.category;
+    if (params?.search) queryParams.search = params.search;
+    return apiClient.get<BankAccountListResponse>("/api/v1/accounts", { params: queryParams });
+  },
+
+  get: (id: string) => apiClient.get<BankAccountResponse>(`/api/v1/accounts/${id}`),
+
+  getBalance: (id: string) => apiClient.get<BalanceResponse>(`/api/v1/accounts/${id}/balance`),
+
+  create: (data: {
+    account_type: string;
+    holder_name: string;
+    holder_type: string;
+    currency?: string;
+    country_code?: string;
+    initial_balance?: number;
+    is_internal?: boolean;
+  }) => apiClient.post<BankAccountResponse>("/api/v1/accounts", data),
+
+  createInternal: (data: {
+    account_name: string;
+    account_type: string;
+    currency?: string;
+    purpose?: string;
+    initial_balance?: number;
+  }) => apiClient.post<BankAccountResponse>("/api/v1/accounts/internal", data),
+};
+
+export const ibanApi = {
+  validate: (iban: string, bic?: string) =>
+    apiClient.post<IBANValidationResponse>("/api/v1/iban/validate", { iban, bic }),
+
+  generate: (countryCode?: string, bankCode?: string) =>
+    apiClient.post<{
+      success: boolean;
+      data?: {
+        iban: string;
+        iban_formatted: string;
+        bic: string;
+        bic_formatted: string;
+        is_valid: string;
+        country_code: string;
+      };
+    }>("/api/v1/iban/generate", { country_code: countryCode, bank_code: bankCode }),
+
+  parse: (iban: string) =>
+    apiClient.post<{
+      success: boolean;
+      data?: {
+        iban: string;
+        bic: string;
+        bank_code: string;
+        branch_code: string;
+        country_code: string;
+        is_valid: boolean;
+        bank_name?: string;
+      };
+    }>("/api/v1/iban/parse", { iban }),
+};
+
+export interface CardCreateRequest {
+  account_id: string;
+  card_type: "PHYSICAL" | "VIRTUAL";
+  brand?: "MASTERCARD" | "VISA";
+  holder_name?: string;
+  spending_limit?: number;
+  ATM_limit?: number;
+  online_payments?: boolean;
+  contactless?: boolean;
+  international?: boolean;
+}
+
+export interface CardResponse {
+  success: boolean;
+  data?: BankCard;
+  error?: string;
+}
+
+export interface CardListData {
+  data: BankCard[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface CardListResponse {
+  success: boolean;
+  data?: CardListData;
+  error?: string;
+}
+
+export const cardsApi = {
+  create: (data: CardCreateRequest) => apiClient.post<CardResponse>("/api/v1/cards", data),
+
+  list: () => apiClient.get<CardListResponse>("/api/v1/cards"),
+
+  get: (id: string) => apiClient.get<CardResponse>(`/api/v1/cards/${id}`),
+
+  freeze: (id: string, reason?: string) =>
+    apiClient.post<CardResponse>(`/api/v1/cards/${id}/freeze`, { reason }),
+
+  unfreeze: (id: string) => apiClient.post<CardResponse>(`/api/v1/cards/${id}/unfreeze`),
 };

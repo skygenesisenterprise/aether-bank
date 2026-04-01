@@ -28,6 +28,8 @@ const (
 
 type BankingAccount struct {
 	ID        string                 `json:"id"`
+	UserID    string                 `json:"user_id,omitempty"`
+	ClientID  string                 `json:"client_id,omitempty"`
 	Type      BankingAccountType     `json:"type"`
 	Currency  string                 `json:"currency"`
 	Status    BankingAccountStatus   `json:"status"`
@@ -60,14 +62,15 @@ type BankingAccountList struct {
 }
 
 type CreateBankingAccountRequest struct {
-	Type        BankingAccountType     `json:"type"`
-	Currency    string                 `json:"currency"`
-	HolderName  string                 `json:"holder_name"`
-	HolderType  HolderType             `json:"holder_type"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
-	CountryCode string                 `json:"country_code,omitempty"`
-	BankCode    string                 `json:"bank_code,omitempty"`
-	IsInternal  bool                   `json:"is_internal,omitempty"`
+	Type           BankingAccountType     `json:"type"`
+	Currency       string                 `json:"currency"`
+	HolderName     string                 `json:"holder_name"`
+	HolderType     HolderType             `json:"holder_type"`
+	Metadata       map[string]interface{} `json:"metadata,omitempty"`
+	CountryCode    string                 `json:"country_code,omitempty"`
+	BankCode       string                 `json:"bank_code,omitempty"`
+	IsInternal     bool                   `json:"is_internal,omitempty"`
+	InitialBalance int64                  `json:"initial_balance"`
 }
 
 type CreateBankAccountRequest struct {
@@ -82,11 +85,12 @@ type CreateBankAccountRequest struct {
 }
 
 type CreateInternalAccountRequest struct {
-	AccountName string                 `json:"account_name"`
-	AccountType string                 `json:"account_type"`
-	Currency    string                 `json:"currency"`
-	Purpose     string                 `json:"purpose"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+	AccountName    string                 `json:"account_name"`
+	AccountType    string                 `json:"account_type"`
+	Currency       string                 `json:"currency"`
+	Purpose        string                 `json:"purpose"`
+	InitialBalance int64                  `json:"initial_balance"`
+	Metadata       map[string]interface{} `json:"metadata,omitempty"`
 }
 
 type BankingAccountResponse struct {
@@ -114,26 +118,41 @@ type BankAccountResponse struct {
 }
 
 type BankAccountData struct {
-	ID               string `json:"id"`
-	AccountNumber    string `json:"account_number"`
-	Name             string `json:"name"`
-	Type             string `json:"type"`
-	AccountType      string `json:"account_type"`
-	Owner            string `json:"owner"`
-	OwnerType        string `json:"owner_type"`
-	OwnerCategory    string `json:"owner_category"`
-	Balance          int64  `json:"balance"`
-	AvailableBalance int64  `json:"available_balance"`
-	Status           string `json:"status"`
-	Currency         string `json:"currency"`
-	IBAN             string `json:"iban"`
-	IBANFormatted    string `json:"iban_formatted"`
-	BIC              string `json:"bic"`
-	BICFormatted     string `json:"bic_formatted"`
-	IsValid          bool   `json:"is_valid"`
-	BankName         string `json:"bank_name,omitempty"`
-	CreatedAt        string `json:"created_at"`
-	UpdatedAt        string `json:"updated_at"`
+	ID               string    `json:"id"`
+	AccountNumber    string    `json:"account_number"`
+	Name             string    `json:"name"`
+	Type             string    `json:"type"`
+	AccountType      string    `json:"account_type"`
+	Owner            string    `json:"owner"`
+	OwnerType        string    `json:"owner_type"`
+	OwnerCategory    string    `json:"owner_category"`
+	Balance          int64     `json:"balance"`
+	AvailableBalance int64     `json:"available_balance"`
+	Status           string    `json:"status"`
+	Currency         string    `json:"currency"`
+	IBAN             string    `json:"iban"`
+	IBANFormatted    string    `json:"iban_formatted"`
+	BIC              string    `json:"bic"`
+	BICFormatted     string    `json:"bic_formatted"`
+	BankID           string    `json:"bank_id"`
+	IsValid          bool      `json:"is_valid"`
+	BankName         string    `json:"bank_name,omitempty"`
+	Card             *BankCard `json:"card,omitempty"`
+	CreatedAt        string    `json:"created_at"`
+	UpdatedAt        string    `json:"updated_at"`
+}
+
+type BankCard struct {
+	ID          string `json:"id"`
+	Last4       string `json:"last4"`
+	Pan         string `json:"pan,omitempty"`
+	ExpiryMonth int    `json:"expiry_month"`
+	ExpiryYear  int    `json:"expiry_year"`
+	CVC         string `json:"cvc,omitempty"`
+	CardType    string `json:"card_type"`
+	Brand       string `json:"brand"`
+	Status      string `json:"status"`
+	HolderName  string `json:"holder_name"`
 }
 
 type BankAccountListResponse struct {

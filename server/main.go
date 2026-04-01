@@ -53,16 +53,21 @@ func main() {
 	}
 
 	jwtService := services.NewJWTService(cfg.JWT.Secret, cfg.JWT.Expiry, cfg.JWT.Issuer)
+	serviceKeyService := services.NewServiceKeyService()
+
+	fmt.Printf("\033[1;32m[✓] Service keys initialized\033[0m\n")
+	fmt.Printf("\033[1;33m[!] Default service keys generated (check logs for sk_ keys)\033[0m\n")
 
 	router := gin.Default()
 
 	router.Use(middleware.CORS(cfg.CORS.AllowedOrigins))
 
-	routes.SetupRoutes(router, jwtService)
+	routes.SetupRoutesWithServiceKey(router, jwtService, serviceKeyService)
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	fmt.Printf("\033[1;32m[✓] Server starting on %s\033[0m\n", addr)
 	fmt.Printf("\033[1;36m[✓] API available at http://localhost%s/api/v1\033[0m\n", addr)
+	fmt.Printf("\033[1;33m[!] Service key auth enabled\033[0m\n")
 	fmt.Printf("\n")
 
 	if err := router.Run(addr); err != nil {

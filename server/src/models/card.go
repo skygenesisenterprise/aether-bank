@@ -33,10 +33,12 @@ type BankingCard struct {
 	PAN               string          `json:"pan,omitempty"`
 	CVV               string          `json:"cvv,omitempty"`
 	SpendingLimits    *SpendingLimits `json:"spending_limits"`
+	ProviderRef       string          `json:"provider_ref,omitempty"`
 	FrozenAt          *time.Time      `json:"frozen_at,omitempty"`
 	FrozenReason      string          `json:"frozen_reason,omitempty"`
 	EstimatedDelivery *time.Time      `json:"estimated_delivery,omitempty"`
 	CreatedAt         time.Time       `json:"created_at"`
+	UpdatedAt         time.Time       `json:"updated_at,omitempty"`
 }
 
 type SpendingLimits struct {

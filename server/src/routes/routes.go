@@ -30,10 +30,55 @@ func checkPasswordHash(password, hash string) bool {
 // SetupRoutes configure toutes les routes API
 // C'est le point d'entrée principal pour la configuration des routes
 func SetupRoutes(router *gin.Engine, jwtService *services.JWTService) {
+	SetupRoutesWithServiceKey(router, jwtService, nil)
+}
+
+// SetupRoutesWithServiceKey configure toutes les routes API avec service key optionnel
+func SetupRoutesWithServiceKey(router *gin.Engine, jwtService *services.JWTService, serviceKeyService *services.ServiceKeyService) {
 	authMiddleware := middleware.NewAuthMiddleware(jwtService)
+
+	var serviceKeyMiddleware *middleware.ServiceKeyMiddleware
+	if serviceKeyService != nil {
+		serviceKeyMiddleware = middleware.NewServiceKeyMiddleware(serviceKeyService)
+	}
 
 	api := router.Group("/api/v1")
 	{
+
+		// ==================== SERVICE KEYS (Admin) ====================
+		if serviceKeyMiddleware != nil {
+			serviceKeyHandler := NewServiceKeyHandler(serviceKeyService)
+			serviceKeys := api.Group("/service-keys")
+			serviceKeys.Use(serviceKeyMiddleware.RequireServiceKeyWithScope("admin"))
+			{
+				serviceKeys.GET("/", serviceKeyHandler.ListKeys)
+				serviceKeys.POST("/", serviceKeyHandler.CreateKey)
+				serviceKeys.DELETE("/:id", serviceKeyHandler.RevokeKey)
+				serviceKeys.GET("/me", serviceKeyHandler.GetCurrentKey)
+			}
+		}
+
+		// ==================== HEALTH ====================
+		api.GET("/health", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{
+				"status":  "healthy",
+				"service": "aether-bank-api",
+				"version": "1.0.0",
+			})
+		})
+
+		// ==================== INFO ====================
+		api.GET("/info", func(c *gin.Context) {
+			info := gin.H{
+				"name":    "Aether Bank API",
+				"version": "1.0.0",
+				"status":  "operational",
+			}
+			if serviceKeyMiddleware != nil {
+				info["auth"] = "service_key_required"
+			}
+			c.JSON(http.StatusOK, info)
+		})
 		// ==================== AUTH (Aether Account) ====================
 		authHandler := NewAuthHandler(jwtService)
 		auth := api.Group("/auth")
@@ -460,9 +505,16 @@ func SetupRoutes(router *gin.Engine, jwtService *services.JWTService) {
 		}
 
 		// ==================== WALLET (Apple Pay / Google Wallet) ====================
-		walletHandler := NewWalletHandler()
+		walletService := services.NewAppleWalletService("XXXXXXXXXX", "pass.com.aetherbank.wallet", "http://localhost:8080")
+		walletHandler := NewWalletHandler(walletService)
 		wallet := api.Group("/wallet")
 		{
+			wallet.POST("/passes/generate", walletHandler.GeneratePass)
+			wallet.GET("/passes/download", walletHandler.DownloadPass)
+			wallet.POST("/passes/:id/revoke", walletHandler.RevokePass)
+			wallet.GET("/passes/:id", walletHandler.GetPassStatus)
+			wallet.GET("/passes", walletHandler.ListUserPasses)
+			wallet.GET("/passes/validate", walletHandler.ValidateToken)
 			wallet.POST("/apple/generate-pass", walletHandler.GenerateApplePayPass)
 			wallet.POST("/google/generate-pass", walletHandler.GenerateGoogleWalletPass)
 			wallet.POST("/google/create-add-link", walletHandler.CreateGoogleAddToWalletLink)
@@ -688,6 +740,137 @@ func (h *AuthHandler) ValidateToken(c *gin.Context) {
 	c.JSON(http.StatusOK, models.AuthResponse{
 		Success: true,
 		Data:    &models.TokenResponse{User: &models.User{ID: claims.UserID, Email: claims.Email, Name: claims.Username, Active: true}},
+	})
+}
+
+// ==================== SERVICE KEY HANDLERS ====================
+
+type ServiceKeyHandler struct {
+	serviceKeyService *services.ServiceKeyService
+}
+
+func NewServiceKeyHandler(serviceKeyService *services.ServiceKeyService) *ServiceKeyHandler {
+	return &ServiceKeyHandler{
+		serviceKeyService: serviceKeyService,
+	}
+}
+
+type CreateServiceKeyRequest struct {
+	Name  string `json:"name" binding:"required"`
+	Scope string `json:"scope" binding:"required"`
+}
+
+type ServiceKeyResponse struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Key       string `json:"key"`
+	Scope     string `json:"scope"`
+	Active    bool   `json:"active"`
+	CreatedAt string `json:"created_at"`
+	ExpiresAt string `json:"expires_at,omitempty"`
+	LastUsed  string `json:"last_used,omitempty"`
+}
+
+func (h *ServiceKeyHandler) ListKeys(c *gin.Context) {
+	keys := h.serviceKeyService.ListKeys()
+
+	response := make([]ServiceKeyResponse, 0, len(keys))
+	for _, key := range keys {
+		resp := ServiceKeyResponse{
+			ID:        key.ID,
+			Name:      key.Name,
+			Key:       key.Key,
+			Scope:     key.Scope,
+			Active:    key.Active,
+			CreatedAt: key.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+		if !key.ExpiresAt.IsZero() {
+			resp.ExpiresAt = key.ExpiresAt.Format("2006-01-02T15:04:05Z07:00")
+		}
+		if !key.LastUsed.IsZero() {
+			resp.LastUsed = key.LastUsed.Format("2006-01-02T15:04:05Z07:00")
+		}
+		response = append(response, resp)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    response,
+		"total":   len(response),
+	})
+}
+
+func (h *ServiceKeyHandler) CreateKey(c *gin.Context) {
+	var req CreateServiceKeyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid request body",
+		})
+		return
+	}
+
+	key, err := h.serviceKeyService.GenerateKey(req.Name, req.Scope)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to generate service key",
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"success": true,
+		"data": ServiceKeyResponse{
+			ID:        key.ID,
+			Name:      key.Name,
+			Key:       key.Key,
+			Scope:     key.Scope,
+			Active:    key.Active,
+			CreatedAt: key.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		},
+		"message": "Service key created. Store this key securely - it will not be shown again.",
+	})
+}
+
+func (h *ServiceKeyHandler) RevokeKey(c *gin.Context) {
+	keyID := c.Param("id")
+
+	key := h.serviceKeyService.GetKeyByID(keyID)
+	if key == nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":   "Service key not found",
+		})
+		return
+	}
+
+	if err := h.serviceKeyService.RevokeKey(key.Key); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to revoke service key",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Service key revoked successfully",
+	})
+}
+
+func (h *ServiceKeyHandler) GetCurrentKey(c *gin.Context) {
+	keyID, _ := c.Get("serviceKeyID")
+	keyName, _ := c.Get("serviceKeyName")
+	keyScope, _ := c.Get("serviceKeyScope")
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"id":    keyID,
+			"name":  keyName,
+			"scope": keyScope,
+		},
 	})
 }
 
@@ -3614,10 +3797,14 @@ func (h *LedgerHandler) GetLedgerEntries(c *gin.Context) {
 
 // ==================== WALLET HANDLERS ====================
 
-type WalletHandler struct{}
+type WalletHandler struct {
+	walletService *services.WalletService
+}
 
-func NewWalletHandler() *WalletHandler {
-	return &WalletHandler{}
+func NewWalletHandler(walletService *services.WalletService) *WalletHandler {
+	return &WalletHandler{
+		walletService: walletService,
+	}
 }
 
 type ApplePayPassRequest struct {
@@ -3717,6 +3904,225 @@ func (h *WalletHandler) GetWalletPassStatus(c *gin.Context) {
 	}})
 }
 
+// New Wallet Pass endpoints
+
+type GenerateWalletPassRequest struct {
+	UserID      string `json:"user_id" binding:"required"`
+	HolderName  string `json:"holder_name" binding:"required"`
+	CardLast4   string `json:"card_last4" binding:"required"`
+	CardBrand   string `json:"card_brand"`
+	PassType    string `json:"pass_type"`
+	CardNumber  string `json:"card_number"`
+	ExpiryMonth string `json:"expiry_month"`
+	ExpiryYear  string `json:"expiry_year"`
+}
+
+func (h *WalletHandler) GeneratePass(c *gin.Context) {
+	var req GenerateWalletPassRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid request body",
+		})
+		return
+	}
+
+	passType := services.WalletPassTypeStandard
+	if req.PassType == "premium" {
+		passType = services.WalletPassTypePremium
+	} else if req.PassType == "virtual" {
+		passType = services.WalletPassTypeVirtual
+	}
+
+	if req.CardBrand == "" {
+		req.CardBrand = "MASTERCARD"
+	}
+
+	pass, err := h.walletService.GeneratePass(req.UserID, req.HolderName, req.CardLast4, req.CardBrand, passType)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to generate pass",
+		})
+		return
+	}
+
+	token, err := h.walletService.GenerateToken(pass.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to generate token",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"id":            pass.ID,
+			"serial_number": pass.SerialNumber,
+			"token":         token,
+			"download_url":  h.walletService.GetDownloadURL(token),
+			"expires_at":    pass.TokenExpiresAt.Format("2006-01-02T15:04:05Z"),
+			"pass_type":     string(pass.PassType),
+			"status":        pass.Status,
+		},
+	})
+}
+
+func (h *WalletHandler) DownloadPass(c *gin.Context) {
+	token := c.Query("token")
+	if token == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Token is required",
+		})
+		return
+	}
+
+	pass, err := h.walletService.ValidateToken(token)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Invalid or expired token",
+		})
+		return
+	}
+
+	cardNumber := c.Query("card_number")
+	if cardNumber == "" {
+		cardNumber = "0000" + pass.CardLast4
+	}
+	expiryMonth := c.Query("expiry_month")
+	if expiryMonth == "" {
+		expiryMonth = "12"
+	}
+	expiryYear := c.Query("expiry_year")
+	if expiryYear == "" {
+		expiryYear = "2027"
+	}
+
+	pkPassData, err := h.walletService.GeneratePKPass(pass, cardNumber, expiryMonth, expiryYear)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to generate pkpass",
+		})
+		return
+	}
+
+	c.Header("Content-Type", "application/vnd.apple.pkpass")
+	c.Header("Content-Disposition", "attachment; filename=\"aether-card.pkpass\"")
+	c.Data(http.StatusOK, "application/vnd.apple.pkpass", pkPassData)
+}
+
+func (h *WalletHandler) RevokePass(c *gin.Context) {
+	passID := c.Param("id")
+
+	if err := h.walletService.RevokePass(passID); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Pass revoked successfully",
+	})
+}
+
+func (h *WalletHandler) GetPassStatus(c *gin.Context) {
+	passID := c.Param("id")
+
+	pass := h.walletService.GetPass(passID)
+	if pass == nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":   "Pass not found",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"id":            pass.ID,
+			"serial_number": pass.SerialNumber,
+			"pass_type":     string(pass.PassType),
+			"status":        pass.Status,
+			"card_last4":    pass.CardLast4,
+			"card_brand":    pass.CardBrand,
+			"holder_name":   pass.HolderName,
+			"created_at":    pass.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		},
+	})
+}
+
+func (h *WalletHandler) ListUserPasses(c *gin.Context) {
+	userID := c.Query("user_id")
+	if userID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "user_id is required",
+		})
+		return
+	}
+
+	passes := h.walletService.GetPassesByUserID(userID)
+
+	response := make([]gin.H, 0, len(passes))
+	for _, pass := range passes {
+		response = append(response, gin.H{
+			"id":            pass.ID,
+			"serial_number": pass.SerialNumber,
+			"pass_type":     string(pass.PassType),
+			"status":        pass.Status,
+			"card_last4":    pass.CardLast4,
+			"card_brand":    pass.CardBrand,
+			"holder_name":   pass.HolderName,
+			"created_at":    pass.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    response,
+		"total":   len(response),
+	})
+}
+
+func (h *WalletHandler) ValidateToken(c *gin.Context) {
+	token := c.Query("token")
+	if token == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "token is required",
+		})
+		return
+	}
+
+	pass, err := h.walletService.ValidateToken(token)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   err.Error(),
+			"valid":   false,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":       true,
+		"valid":         true,
+		"pass_id":       pass.ID,
+		"serial_number": pass.SerialNumber,
+		"pass_type":     string(pass.PassType),
+		"expires_at":    pass.TokenExpiresAt.Format("2006-01-02T15:04:05Z"),
+	})
+}
+
 // ==================== BANK ACCOUNT HANDLERS ====================
 
 type BankAccountHandler struct{}
@@ -3743,6 +4149,8 @@ func (h *BankAccountHandler) CreateAccount(c *gin.Context) {
 		})
 		return
 	}
+
+	fmt.Printf("[DEBUG] CreateAccount received initial_balance: %d\n", req.InitialBalance)
 
 	sepaService := services.NewSEPAService()
 
@@ -3808,6 +4216,8 @@ func (h *BankAccountHandler) CreateAccount(c *gin.Context) {
 		UpdatedAt: services.GetCurrentTime(),
 	}
 
+	fmt.Printf("[DEBUG] Created account with Balance.Available: %d, Balance.Current: %d\n", account.Balance.Available, account.Balance.Current)
+
 	services.SetBankingAccount(account)
 
 	accountData := models.BankAccountData{
@@ -3833,6 +4243,8 @@ func (h *BankAccountHandler) CreateAccount(c *gin.Context) {
 		UpdatedAt:        services.FormatTime(account.UpdatedAt),
 	}
 
+	fmt.Printf("[DEBUG] Returning account with Balance: %d, AvailableBalance: %d\n", accountData.Balance, accountData.AvailableBalance)
+
 	c.JSON(http.StatusCreated, models.BankAccountResponse{
 		Success: true,
 		Data:    &accountData,
@@ -3841,10 +4253,11 @@ func (h *BankAccountHandler) CreateAccount(c *gin.Context) {
 
 func (h *BankAccountHandler) CreateInternalAccount(c *gin.Context) {
 	var req struct {
-		AccountName string `json:"account_name" binding:"required"`
-		AccountType string `json:"account_type" binding:"required"`
-		Currency    string `json:"currency"`
-		Purpose     string `json:"purpose"`
+		AccountName    string `json:"account_name" binding:"required"`
+		AccountType    string `json:"account_type" binding:"required"`
+		Currency       string `json:"currency"`
+		Purpose        string `json:"purpose"`
+		InitialBalance int64  `json:"initial_balance"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -3854,6 +4267,8 @@ func (h *BankAccountHandler) CreateInternalAccount(c *gin.Context) {
 		})
 		return
 	}
+
+	fmt.Printf("[DEBUG] CreateInternalAccount received initial_balance: %d\n", req.InitialBalance)
 
 	sepaService := services.NewSEPAService()
 
@@ -3878,6 +4293,8 @@ func (h *BankAccountHandler) CreateInternalAccount(c *gin.Context) {
 		accountType = models.BankingAccountTypeCurrent
 	}
 
+	initialBalance := req.InitialBalance
+
 	account := &models.BankingAccount{
 		ID:       services.GenerateBankingID("acc"),
 		Type:     accountType,
@@ -3890,14 +4307,16 @@ func (h *BankAccountHandler) CreateInternalAccount(c *gin.Context) {
 			Type: models.HolderTypeBusiness,
 		},
 		Balance: &models.AccountBalance{
-			Available: 0,
-			Current:   0,
+			Available: initialBalance,
+			Current:   initialBalance,
 			Pending:   0,
 			Overdraft: 0,
 		},
 		CreatedAt: services.GetCurrentTime(),
 		UpdatedAt: services.GetCurrentTime(),
 	}
+
+	fmt.Printf("[DEBUG] Created internal account with Balance.Available: %d, Balance.Current: %d\n", account.Balance.Available, account.Balance.Current)
 
 	services.SetBankingAccount(account)
 
@@ -3910,8 +4329,8 @@ func (h *BankAccountHandler) CreateInternalAccount(c *gin.Context) {
 		Owner:            "Aether Bank",
 		OwnerType:        "Banque",
 		OwnerCategory:    "bank",
-		Balance:          0,
-		AvailableBalance: 0,
+		Balance:          initialBalance,
+		AvailableBalance: initialBalance,
 		Status:           string(account.Status),
 		Currency:         account.Currency,
 		IBAN:             iban,
@@ -3940,6 +4359,11 @@ func (h *BankAccountHandler) ListAccounts(c *gin.Context) {
 	sepaService := services.NewSEPAService()
 
 	accounts := bankingService.ListAccountsData(status, accountType, 100, 0)
+
+	fmt.Printf("[DEBUG] ListAccounts returning %d accounts\n", len(accounts))
+	for i, acc := range accounts {
+		fmt.Printf("[DEBUG] Account[%d] ID=%s, Balance.Current=%d, Balance.Available=%d\n", i, acc.ID, acc.Balance.Current, acc.Balance.Available)
+	}
 
 	var filteredAccounts []models.BankAccountData
 	for _, acc := range accounts {
@@ -3976,6 +4400,8 @@ func (h *BankAccountHandler) ListAccounts(c *gin.Context) {
 			ownerType = "Entreprise"
 		}
 
+		bankID := sepaService.GetBankCode(acc.BIC)
+
 		accountData := models.BankAccountData{
 			ID:               acc.ID,
 			AccountNumber:    acc.IBAN,
@@ -3993,6 +4419,7 @@ func (h *BankAccountHandler) ListAccounts(c *gin.Context) {
 			IBANFormatted:    sepaService.FormatIBAN(acc.IBAN),
 			BIC:              acc.BIC,
 			BICFormatted:     sepaService.FormatBIC(acc.BIC),
+			BankID:           bankID,
 			IsValid:          sepaService.ValidateIBAN(acc.IBAN),
 			BankName:         sepaService.GetBankName(acc.BIC),
 			CreatedAt:        services.FormatTime(acc.CreatedAt),
@@ -4039,6 +4466,8 @@ func (h *BankAccountHandler) GetAccount(c *gin.Context) {
 		ownerType = "Entreprise"
 	}
 
+	bankID := sepaService.GetBankCode(account.BIC)
+
 	accountData := models.BankAccountData{
 		ID:               account.ID,
 		AccountNumber:    account.IBAN,
@@ -4056,6 +4485,7 @@ func (h *BankAccountHandler) GetAccount(c *gin.Context) {
 		IBANFormatted:    sepaService.FormatIBAN(account.IBAN),
 		BIC:              account.BIC,
 		BICFormatted:     sepaService.FormatBIC(account.BIC),
+		BankID:           bankID,
 		IsValid:          sepaService.ValidateIBAN(account.IBAN),
 		BankName:         sepaService.GetBankName(account.BIC),
 		CreatedAt:        services.FormatTime(account.CreatedAt),

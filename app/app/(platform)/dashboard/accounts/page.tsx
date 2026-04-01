@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Wallet,
@@ -48,6 +48,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { accountsApi, BankAccount, getBalance, getAvailableBalance } from "@/lib/api/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -102,213 +103,6 @@ const bankAccountTypeOptions = [
   { value: "Compte Opérationnel", description: "Opérations quotidiennes" },
   { value: "Compte Garanti", description: "Fonds de garantie dépôts" },
   { value: "Compte Correspondant", description: "Relations interbancaires" },
-];
-
-const accounts = [
-  {
-    id: 1,
-    accountNumber: "FR76 3000 4000 1245 6789 0123 456",
-    name: "Compte Pro #1245",
-    type: "Compte Courant",
-    accountType: "Professionnel",
-    owner: "SARL TechSolutions",
-    ownerType: "Entreprise",
-    ownerCategory: "client",
-    balance: 245000.0,
-    availableBalance: 242000.0,
-    status: "active",
-    currency: "EUR",
-    iban: "FR76 3000 4000 1245 6789 0123 456",
-    bic: "BNPAFRPPXXX",
-    createdAt: "Il y a 1j",
-  },
-  {
-    id: 2,
-    accountNumber: "FR76 3000 4000 7821 3456 7890 123",
-    name: "Compte Particulier #7821",
-    type: "Compte Courant",
-    accountType: "Particulier",
-    owner: "Marie Dupont",
-    ownerType: "Particulier",
-    ownerCategory: "client",
-    balance: 15750.0,
-    availableBalance: 15750.0,
-    status: "active",
-    currency: "EUR",
-    iban: "FR76 3000 4000 7821 3456 7890 123",
-    bic: "BNPAFRPPXXX",
-    createdAt: "Il y a 3j",
-  },
-  {
-    id: 3,
-    accountNumber: "FR76 3000 4000 3102 5678 9012 345",
-    name: "Compte Épargne #3102",
-    type: "Livret Épargne",
-    accountType: "Épargne",
-    owner: "Marie Dupont",
-    ownerType: "Particulier",
-    ownerCategory: "client",
-    balance: 52000.0,
-    availableBalance: 52000.0,
-    status: "active",
-    currency: "EUR",
-    iban: "FR76 3000 4000 3102 5678 9012 345",
-    bic: "BNPAFRPPXXX",
-    createdAt: "Il y a 5j",
-  },
-  {
-    id: 4,
-    accountNumber: "FR76 3000 4000 8934 6789 0123 456",
-    name: "Compte Pro #8934",
-    type: "Compte Courant",
-    accountType: "Professionnel",
-    owner: "SAS InnovTech",
-    ownerType: "Entreprise",
-    ownerCategory: "client",
-    balance: 0.0,
-    availableBalance: 0.0,
-    status: "pending",
-    currency: "EUR",
-    iban: "FR76 3000 4000 8934 6789 0123 456",
-    bic: "BNPAFRPPXXX",
-    createdAt: "Il y a 6h",
-  },
-  {
-    id: 5,
-    accountNumber: "FR76 3000 4000 4521 1234 5678 901",
-    name: "Compte Joint #4521",
-    type: "Compte Joint",
-    accountType: "Joint",
-    owner: "Jean & Sophie Martin",
-    ownerType: "Particulier",
-    ownerCategory: "client",
-    balance: 34500.0,
-    availableBalance: 34500.0,
-    status: "active",
-    currency: "EUR",
-    iban: "FR76 3000 4000 4521 1234 5678 901",
-    bic: "BNPAFRPPXXX",
-    createdAt: "Il y a 1sem",
-  },
-  {
-    id: 6,
-    accountNumber: "FR76 3000 4000 5623 2345 6789 012",
-    name: "Compte Pro #5623",
-    type: "Compte Courant",
-    accountType: "Professionnel",
-    owner: "EURL Boulanger",
-    ownerType: "Entreprise",
-    ownerCategory: "client",
-    balance: 45000.0,
-    availableBalance: 44500.0,
-    status: "active",
-    currency: "EUR",
-    iban: "FR76 3000 4000 5623 2345 6789 012",
-    bic: "BNPAFRPPXXX",
-    createdAt: "Il y a 2sem",
-  },
-  {
-    id: 7,
-    accountNumber: "FR76 3000 4000 6734 3456 7890 123",
-    name: "Compte Particulier #6734",
-    type: "Compte Courant",
-    accountType: "Particulier",
-    owner: "Pierre Durant",
-    ownerType: "Particulier",
-    ownerCategory: "client",
-    balance: -2500.0,
-    availableBalance: -2500.0,
-    status: "blocked",
-    currency: "EUR",
-    iban: "FR76 3000 4000 6734 3456 7890 123",
-    bic: "BNPAFRPPXXX",
-    createdAt: "Il y a 1mois",
-  },
-  {
-    id: 8,
-    accountNumber: "FR76 3000 4000 7845 4567 8901 234",
-    name: "Compte Épargne #7845",
-    type: "Livret Épargne",
-    accountType: "Épargne",
-    owner: "Jean Martin",
-    ownerType: "Particulier",
-    ownerCategory: "client",
-    balance: 12300.0,
-    availableBalance: 12300.0,
-    status: "active",
-    currency: "EUR",
-    iban: "FR76 3000 4000 7845 4567 8901 234",
-    bic: "BNPAFRPPXXX",
-    createdAt: "Il y a 1mois",
-  },
-  {
-    id: 101,
-    accountNumber: "FR76 3000 4000 1000 0000 0000 001",
-    name: "Réserve Obligatoire BCE",
-    type: "Compte Réserve",
-    accountType: "Réserve",
-    owner: "Aether Bank",
-    ownerType: "Banque",
-    ownerCategory: "bank",
-    balance: 15000000.0,
-    availableBalance: 15000000.0,
-    status: "active",
-    currency: "EUR",
-    iban: "FR76 3000 4000 1000 0000 0000 001",
-    bic: "AETBFRPPXXX",
-    createdAt: "Création",
-  },
-  {
-    id: 102,
-    accountNumber: "FR76 3000 4000 1000 0000 0000 002",
-    name: "Fonds Propres Tier 1",
-    type: "Compte Capital",
-    accountType: "Capital",
-    owner: "Aether Bank",
-    ownerType: "Banque",
-    ownerCategory: "bank",
-    balance: 25000000.0,
-    availableBalance: 25000000.0,
-    status: "active",
-    currency: "EUR",
-    iban: "FR76 3000 4000 1000 0000 0000 002",
-    bic: "AETBFRPPXXX",
-    createdAt: "Création",
-  },
-  {
-    id: 103,
-    accountNumber: "FR76 3000 4000 1000 0000 0000 003",
-    name: "Réserve Liquidités",
-    type: "Compte Réserve",
-    accountType: "Réserve",
-    owner: "Aether Bank",
-    ownerType: "Banque",
-    ownerCategory: "bank",
-    balance: 8500000.0,
-    availableBalance: 8500000.0,
-    status: "active",
-    currency: "EUR",
-    iban: "FR76 3000 4000 1000 0000 0000 003",
-    bic: "AETBFRPPXXX",
-    createdAt: "Création",
-  },
-  {
-    id: 104,
-    accountNumber: "FR76 3000 4000 1000 0000 0000 004",
-    name: "Compte Opérationnel EUR",
-    type: "Compte Opérationnel",
-    accountType: "Opérationnel",
-    owner: "Aether Bank",
-    ownerType: "Banque",
-    ownerCategory: "bank",
-    balance: 3200000.0,
-    availableBalance: 3200000.0,
-    status: "active",
-    currency: "EUR",
-    iban: "FR76 3000 4000 1000 0000 0000 004",
-    bic: "AETBFRPPXXX",
-    createdAt: "Création",
-  },
 ];
 
 const accountTypeData = [
@@ -462,6 +256,10 @@ export default function AccountsPage() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [isOpenAccountOpen, setIsOpenAccountOpen] = useState(false);
+  const [accounts, setAccounts] = useState<BankAccount[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
   const [newAccount, setNewAccount] = useState({
     category: "client",
     clientId: "",
@@ -471,35 +269,77 @@ export default function AccountsPage() {
     overdraft: false,
     overdraftLimit: 0,
     accountName: "",
+    initialBalance: 0,
   });
 
   const filteredAccounts = accounts.filter((account) => {
+    const name = account.name || account.holder?.name || "";
+    const owner = account.owner || account.holder?.name || "";
     const matchesSearch =
-      account.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      account.owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      account.iban.toLowerCase().includes(searchQuery.toLowerCase());
+      name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (account.iban || "").toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || account.status === statusFilter;
     const matchesType = typeFilter === "all" || account.type === typeFilter;
-    const matchesCategory = categoryFilter === "all" || account.ownerCategory === categoryFilter;
+    const matchesCategory = categoryFilter === "all" || account.owner_category === categoryFilter;
     return matchesSearch && matchesStatus && matchesType && matchesCategory;
   });
 
   const stats = {
     total: accounts.length,
-    totalClients: accounts.filter((a) => a.ownerCategory === "client").length,
-    totalBank: accounts.filter((a) => a.ownerCategory === "bank").length,
+    totalClients: accounts.filter(
+      (a) => (a.owner_category || a.holder?.type) === "client" || a.holder?.type === "individual"
+    ).length,
+    totalBank: accounts.filter((a) => a.owner_category === "bank").length,
     active: accounts.filter((a) => a.status === "active").length,
     pending: accounts.filter((a) => a.status === "pending").length,
     blocked: accounts.filter((a) => a.status === "blocked").length,
-    totalBalance: accounts.reduce((sum, a) => sum + a.balance, 0),
-    totalAvailable: accounts.reduce((sum, a) => sum + a.availableBalance, 0),
+    totalBalance: accounts.reduce((sum, a) => sum + getBalance(a), 0),
+    totalAvailable: accounts.reduce((sum, a) => sum + getAvailableBalance(a), 0),
     bankBalance: accounts
-      .filter((a) => a.ownerCategory === "bank")
-      .reduce((sum, a) => sum + a.balance, 0),
+      .filter((a) => a.owner_category === "bank")
+      .reduce((sum, a) => sum + getBalance(a), 0),
     clientBalance: accounts
-      .filter((a) => a.ownerCategory === "client")
-      .reduce((sum, a) => sum + a.balance, 0),
+      .filter(
+        (a) =>
+          a.owner_category === "client" ||
+          a.holder?.type === "individual" ||
+          a.holder?.type === "business"
+      )
+      .reduce((sum, a) => sum + getBalance(a), 0),
   };
+
+  const fetchAccounts = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await accountsApi.list({
+        status: statusFilter !== "all" ? statusFilter : undefined,
+        type: typeFilter !== "all" ? typeFilter : undefined,
+        category: categoryFilter !== "all" ? categoryFilter : undefined,
+        search: searchQuery || undefined,
+      });
+      console.log("[DEBUG] List accounts response:", response);
+      if (response && response.success && response.data) {
+        const accountsData = Array.isArray(response.data)
+          ? response.data
+          : (response.data as any).data || [];
+        console.log("[DEBUG] Accounts data:", accountsData);
+        console.log("[DEBUG] First account balance:", accountsData[0]?.balance);
+        setAccounts(accountsData);
+      } else {
+        setError(response?.error || "Failed to fetch accounts");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [statusFilter, typeFilter, categoryFilter, searchQuery]);
+
+  useEffect(() => {
+    fetchAccounts();
+  }, [fetchAccounts]);
 
   return (
     <div className="p-6 space-y-6 bg-gray-50/50 min-h-screen">
@@ -531,6 +371,10 @@ export default function AccountsPage() {
               <SelectItem value="1y">Cette année</SelectItem>
             </SelectContent>
           </Select>
+          <Button variant="outline" onClick={fetchAccounts} disabled={isLoading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            Actualiser
+          </Button>
           <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">
             <Download className="mr-2 h-4 w-4" />
             Exporter
@@ -542,7 +386,7 @@ export default function AccountsPage() {
         {quickActions.map((action) => (
           <Link key={action.label} href={action.href}>
             <div className="group flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-600 hover:shadow-lg hover:shadow-indigo-500/10 transition-all cursor-pointer">
-              <div className={`p-3 rounded-xl bg-gradient-to-br ${action.color} shadow-lg`}>
+              <div className={`p-3 rounded-xl bg-linear-to-br ${action.color} shadow-lg`}>
                 <action.icon className="h-5 w-5 text-white" />
               </div>
               <div>
@@ -557,7 +401,7 @@ export default function AccountsPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950/30 dark:to-gray-800">
+        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-linear-to-br from-indigo-50 to-white dark:from-indigo-950/30 dark:to-gray-800">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-indigo-700 dark:text-indigo-300 font-medium">
@@ -578,7 +422,7 @@ export default function AccountsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-purple-50 to-white dark:from-purple-950/30 dark:to-gray-800">
+        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-linear-to-br from-purple-50 to-white dark:from-purple-950/30 dark:to-gray-800">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-purple-700 dark:text-purple-300 font-medium">
@@ -601,7 +445,7 @@ export default function AccountsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-cyan-50 to-white dark:from-cyan-950/30 dark:to-gray-800">
+        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-linear-to-br from-cyan-50 to-white dark:from-cyan-950/30 dark:to-gray-800">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-cyan-700 dark:text-cyan-300 font-medium">
@@ -620,7 +464,7 @@ export default function AccountsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/30 dark:to-gray-800">
+        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-linear-to-br from-emerald-50 to-white dark:from-emerald-950/30 dark:to-gray-800">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-emerald-700 dark:text-emerald-300 font-medium">
@@ -677,7 +521,7 @@ export default function AccountsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-amber-50 to-white dark:from-amber-950/30 dark:to-gray-800">
+        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-linear-to-br from-amber-50 to-white dark:from-amber-950/30 dark:to-gray-800">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-amber-700 dark:text-amber-300 font-medium">
@@ -904,7 +748,7 @@ export default function AccountsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm bg-gradient-to-br from-indigo-600 to-purple-700 text-white">
+        <Card className="border-0 shadow-sm bg-linear-to-br from-indigo-600 to-purple-700 text-white">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
@@ -1005,96 +849,128 @@ export default function AccountsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {filteredAccounts.slice(0, 8).map((account) => (
-                    <tr
-                      key={account.id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-                    >
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                              account.ownerCategory === "bank"
-                                ? "bg-amber-100 dark:bg-amber-900/30"
-                                : "bg-indigo-100 dark:bg-indigo-900/30"
-                            }`}
-                          >
-                            {getTypeIcon(account.type)}
-                          </div>
-                          <div>
-                            <p className="font-medium text-sm text-gray-900 dark:text-white">
-                              {account.name}
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                              {account.iban.slice(-8)}
-                            </p>
-                          </div>
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center">
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                          <p className="text-sm text-gray-500">Chargement des comptes...</p>
                         </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          {account.ownerCategory === "bank" ? (
-                            <Badge
-                              variant="outline"
-                              className="bg-amber-50 text-amber-700 border-amber-200 text-xs"
-                            >
-                              <ShieldCheck className="h-3 w-3 mr-1" />
-                              {account.ownerType}
-                            </Badge>
-                          ) : account.ownerType === "Entreprise" ? (
-                            <Building className="h-4 w-4 text-gray-400" />
-                          ) : (
-                            <User className="h-4 w-4 text-gray-400" />
-                          )}
-                          <span className="text-sm text-gray-700 dark:text-gray-300">
-                            {account.owner}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <Badge variant="outline" className="text-xs">
-                          {account.type}
-                        </Badge>
-                      </td>
-                      <td className="p-4">{getStatusBadge(account.status)}</td>
-                      <td className="p-4 text-right">
-                        <p
-                          className={`font-semibold text-sm ${account.balance < 0 ? "text-red-600" : "text-gray-900 dark:text-white"}`}
-                        >
-                          {formatCurrency(account.balance, account.currency)}
-                        </p>
-                      </td>
-                      <td className="p-4">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link href={`/dashboard/accounts/${account.id}`}>
-                                <Eye className="h-4 w-4 mr-2" />
-                                Voir détails
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <FileText className="h-4 w-4 mr-2" />
-                              Opérations
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <RefreshCw className="h-4 w-4 mr-2" />
-                              Modifier
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600">
-                              <XCircle className="h-4 w-4 mr-2" />
-                              Bloquer
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
                       </td>
                     </tr>
-                  ))}
+                  ) : error ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center">
+                        <div className="flex flex-col items-center gap-2">
+                          <AlertCircle className="h-8 w-8 text-red-500" />
+                          <p className="text-sm text-red-600">{error}</p>
+                          <Button variant="outline" size="sm" onClick={fetchAccounts}>
+                            Réessayer
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : filteredAccounts.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center">
+                        <div className="flex flex-col items-center gap-2">
+                          <Wallet className="h-8 w-8 text-gray-400" />
+                          <p className="text-sm text-gray-500">Aucun compte trouvé</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAccounts.slice(0, 8).map((account) => (
+                      <tr
+                        key={account.id}
+                        className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                      >
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                                account.owner_category === "bank"
+                                  ? "bg-amber-100 dark:bg-amber-900/30"
+                                  : "bg-indigo-100 dark:bg-indigo-900/30"
+                              }`}
+                            >
+                              {getTypeIcon(account.type || "default")}
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm text-gray-900 dark:text-white">
+                                {account.name || "Compte"}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {(account.iban || "").slice(-8)}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            {account.owner_category === "bank" ? (
+                              <Badge
+                                variant="outline"
+                                className="bg-amber-50 text-amber-700 border-amber-200 text-xs"
+                              >
+                                <ShieldCheck className="h-3 w-3 mr-1" />
+                                {account.owner_type}
+                              </Badge>
+                            ) : account.owner_type === "Entreprise" ? (
+                              <Building className="h-4 w-4 text-gray-400" />
+                            ) : (
+                              <User className="h-4 w-4 text-gray-400" />
+                            )}
+                            <span className="text-sm text-gray-700 dark:text-gray-300">
+                              {account.owner}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <Badge variant="outline" className="text-xs">
+                            {account.type || "Compte Courant"}
+                          </Badge>
+                        </td>
+                        <td className="p-4">{getStatusBadge(account.status)}</td>
+                        <td className="p-4 text-right">
+                          <p
+                            className={`font-semibold text-sm ${getBalance(account) < 0 ? "text-red-600" : "text-gray-900 dark:text-white"}`}
+                          >
+                            {formatCurrency(getBalance(account), account.currency)}
+                          </p>
+                        </td>
+                        <td className="p-4">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem asChild>
+                                <Link href={`/dashboard/accounts/${account.id}`}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  Voir détails
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <FileText className="h-4 w-4 mr-2" />
+                                Opérations
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                                Modifier
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-red-600">
+                                <XCircle className="h-4 w-4 mr-2" />
+                                Bloquer
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1305,6 +1181,37 @@ export default function AccountsPage() {
                   </Select>
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="initialBalance">Solde Initial</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                      {newAccount.currency === "EUR"
+                        ? "€"
+                        : newAccount.currency === "USD"
+                          ? "$"
+                          : newAccount.currency === "GBP"
+                            ? "£"
+                            : "CHF"}
+                    </span>
+                    <Input
+                      id="initialBalance"
+                      type="number"
+                      placeholder="0.00"
+                      value={newAccount.initialBalance || ""}
+                      onChange={(e) =>
+                        setNewAccount({
+                          ...newAccount,
+                          initialBalance: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className="pl-8"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Attribution d'un solde initial au compte (donnée comptable)
+                  </p>
+                </div>
+
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="overdraft"
@@ -1391,6 +1298,37 @@ export default function AccountsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="initialBalanceBank">Solde Initial</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                      {newAccount.currency === "EUR"
+                        ? "€"
+                        : newAccount.currency === "USD"
+                          ? "$"
+                          : newAccount.currency === "GBP"
+                            ? "£"
+                            : "CHF"}
+                    </span>
+                    <Input
+                      id="initialBalanceBank"
+                      type="number"
+                      placeholder="0.00"
+                      value={newAccount.initialBalance || ""}
+                      onChange={(e) =>
+                        setNewAccount({
+                          ...newAccount,
+                          initialBalance: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className="pl-8"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Attribution d'un solde initial au compte (donnée comptable)
+                  </p>
+                </div>
               </div>
             )}
 
@@ -1446,12 +1384,88 @@ export default function AccountsPage() {
                   ? "bg-amber-600 hover:bg-amber-700"
                   : "bg-indigo-600 hover:bg-indigo-700"
               }
-              onClick={() => {
-                console.log("Creating account:", newAccount);
-                setIsOpenAccountOpen(false);
+              disabled={isCreating}
+              onClick={async () => {
+                try {
+                  setIsCreating(true);
+                  let response;
+
+                  if (newAccount.category === "bank") {
+                    if (!newAccount.accountName.trim()) {
+                      alert("Veuillez entrer un nom pour le compte");
+                      return;
+                    }
+                    const requestData = {
+                      account_name: newAccount.accountName,
+                      account_type: newAccount.bankAccountType,
+                      currency: newAccount.currency,
+                      purpose: "Internal bank account",
+                      initial_balance: newAccount.initialBalance,
+                    };
+                    console.log("[DEBUG] Creating internal account with:", requestData);
+                    response = await accountsApi.createInternal(requestData);
+                    console.log("[DEBUG] CreateInternal response:", response);
+                  } else {
+                    if (!newAccount.clientId) {
+                      alert("Veuillez sélectionner un client");
+                      return;
+                    }
+                    const selectedClient = clients.find(
+                      (c) => c.id.toString() === newAccount.clientId
+                    );
+                    const requestData = {
+                      account_type: newAccount.accountType.toLowerCase().replace(" ", "_"),
+                      holder_name: selectedClient?.name || "",
+                      holder_type:
+                        selectedClient?.type === "Entreprise" ? "business" : "individual",
+                      currency: newAccount.currency,
+                      country_code: "FR",
+                      initial_balance: newAccount.initialBalance,
+                    };
+                    console.log("[DEBUG] Creating account with:", requestData);
+                    response = await accountsApi.create(requestData);
+                    console.log("[DEBUG] Create response:", response);
+                  }
+
+                  if (response && response.success) {
+                    console.log(
+                      "[DEBUG] Account created successfully, balance:",
+                      response.data?.balance
+                    );
+                    setIsOpenAccountOpen(false);
+                    setNewAccount({
+                      category: "client",
+                      clientId: "",
+                      bankAccountType: "Compte Opérationnel",
+                      accountType: "Compte Courant",
+                      currency: "EUR",
+                      overdraft: false,
+                      overdraftLimit: 0,
+                      accountName: "",
+                      initialBalance: 0,
+                    });
+                    await fetchAccounts();
+                  } else {
+                    alert(response?.error || "Erreur lors de la création du compte");
+                  }
+                } catch (err) {
+                  console.error("Failed to create account:", err);
+                  alert(
+                    err instanceof Error ? err.message : "Erreur lors de la création du compte"
+                  );
+                } finally {
+                  setIsCreating(false);
+                }
               }}
             >
-              Créer le compte
+              {isCreating ? (
+                <>
+                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Création...
+                </>
+              ) : (
+                "Créer le compte"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
