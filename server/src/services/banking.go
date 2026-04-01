@@ -27,13 +27,15 @@ func init() {
 }
 
 func seedBankingData() {
+	sepaService := NewSEPAService()
+
 	account := &models.BankingAccount{
 		ID:       generateBankingID("acc"),
 		Type:     models.BankingAccountTypeCurrent,
 		Currency: "EUR",
 		Status:   models.BankingAccountStatusActive,
-		IBAN:     generateIBAN(),
-		BIC:      "NPSYFRPPXXX",
+		IBAN:     sepaService.GenerateRandomIBAN("FR"),
+		BIC:      sepaService.GenerateRandomBIC("AETB"),
 		Holder: &models.AccountHolder{
 			Name: "Demo Account",
 			Type: models.HolderTypeIndividual,
@@ -107,16 +109,56 @@ func NewBankingService() *BankingService {
 }
 
 func (s *BankingService) CreateAccount(req *models.CreateBankingAccountRequest) *models.BankingAccount {
+	sepaService := NewSEPAService()
+
+	iban := sepaService.GenerateRandomIBAN("FR")
+	bic := sepaService.GenerateRandomBIC("AETB")
+
+	if req.Currency == "" {
+		req.Currency = "EUR"
+	}
+
 	account := &models.BankingAccount{
 		ID:       generateBankingID("acc"),
 		Type:     req.Type,
 		Currency: req.Currency,
 		Status:   models.BankingAccountStatusPendingKYC,
-		IBAN:     generateIBAN(),
-		BIC:      "NPSYFRPPXXX",
+		IBAN:     iban,
+		BIC:      bic,
 		Holder: &models.AccountHolder{
 			Name: req.HolderName,
 			Type: req.HolderType,
+		},
+		Balance: &models.AccountBalance{
+			Available: 0,
+			Current:   0,
+			Pending:   0,
+			Overdraft: 0,
+		},
+		Metadata:  req.Metadata,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	bankingAccounts[account.ID] = account
+	return account
+}
+
+func (s *BankingService) CreateInternalAccount(req *models.CreateBankingAccountRequest) *models.BankingAccount {
+	sepaService := NewSEPAService()
+
+	iban := sepaService.GenerateRandomIBAN("FR")
+	bic := "AETBFRPPXXX"
+
+	account := &models.BankingAccount{
+		ID:       generateBankingID("acc"),
+		Type:     req.Type,
+		Currency: req.Currency,
+		Status:   models.BankingAccountStatusActive,
+		IBAN:     iban,
+		BIC:      bic,
+		Holder: &models.AccountHolder{
+			Name: req.HolderName,
+			Type: models.HolderTypeBusiness,
 		},
 		Balance: &models.AccountBalance{
 			Available: 0,
@@ -697,4 +739,56 @@ func (s *BankingService) ListSavingsAccounts(accountID string, limit, offset int
 		Limit:    limit,
 		Offset:   offset,
 	}
+}
+
+func (s *BankingService) ListAccountsData(status, accountType string, limit, offset int) []models.BankingAccount {
+	var accounts []models.BankingAccount
+	for _, acc := range bankingAccounts {
+		if status != "" && string(acc.Status) != status {
+			continue
+		}
+		if accountType != "" && string(acc.Type) != accountType {
+			continue
+		}
+		accounts = append(accounts, *acc)
+	}
+	if limit == 0 {
+		limit = 20
+	}
+	if offset > len(accounts) {
+		offset = len(accounts)
+	}
+	end := offset + limit
+	if end > len(accounts) {
+		end = len(accounts)
+	}
+	return accounts[offset:end]
+}
+
+func SetBankingAccount(account *models.BankingAccount) {
+	bankingAccounts[account.ID] = account
+}
+
+func GenerateBankingID(prefix string) string {
+	return generateBankingID(prefix)
+}
+
+func GetCurrentTime() time.Time {
+	return time.Now()
+}
+
+func FormatTime(t time.Time) string {
+	return t.Format("2006-01-02T15:04:05Z")
+}
+
+func SetBankingCard(card *models.BankingCard) {
+	bankingCards[card.ID] = card
+}
+
+func GetBankingAccounts() map[string]*models.BankingAccount {
+	return bankingAccounts
+}
+
+func GetBankingAccount(id string) *models.BankingAccount {
+	return bankingAccounts[id]
 }

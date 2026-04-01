@@ -4,13 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/skygenesisenterprise/aether-bank/cli/cmd/account"
-	"github.com/skygenesisenterprise/aether-bank/cli/cmd/auth"
-	"github.com/skygenesisenterprise/aether-bank/cli/cmd/debug"
-	"github.com/skygenesisenterprise/aether-bank/cli/cmd/ledger"
-	"github.com/skygenesisenterprise/aether-bank/cli/cmd/transfer"
-	"github.com/skygenesisenterprise/aether-bank/cli/cmd/tx"
-	"github.com/skygenesisenterprise/aether-bank/cli/cmd/user"
 	"github.com/skygenesisenterprise/aether-bank/cli/internal/config"
 
 	"github.com/spf13/cobra"
@@ -29,7 +22,7 @@ to interact with the banking backend in a stable, secure, and scriptable way.
 
 Environment:
   --config, -c    Config file path (default ~/.bank/config.yaml)
-  --env, -e      Environment: staging, prod
+  --env, -e      Environment: local, staging, prod
 
 Examples:
   bank auth login
@@ -49,17 +42,17 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default ~/.bank/config.yaml)")
-	rootCmd.PersistentFlags().StringP("env", "e", "staging", "environment: staging, prod")
+	rootCmd.PersistentFlags().StringP("env", "e", "local", "environment: local, staging, prod")
 	rootCmd.PersistentFlags().Bool("json", false, "JSON output")
 	rootCmd.PersistentFlags().Bool("debug", false, "debug mode")
 
-	rootCmd.AddCommand(auth.Command)
-	rootCmd.AddCommand(user.Command)
-	rootCmd.AddCommand(account.Command)
-	rootCmd.AddCommand(tx.Command)
-	rootCmd.AddCommand(transfer.Command)
-	rootCmd.AddCommand(ledger.Command)
-	rootCmd.AddCommand(debug.Command)
+	rootCmd.AddCommand(authCmd)
+	rootCmd.AddCommand(userCmd)
+	rootCmd.AddCommand(accountCmd)
+	rootCmd.AddCommand(txCmd)
+	rootCmd.AddCommand(transferCmd)
+	rootCmd.AddCommand(ledgerCmd)
+	rootCmd.AddCommand(debugCmd)
 	rootCmd.AddCommand(versionCmd)
 }
 

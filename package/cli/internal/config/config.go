@@ -14,6 +14,7 @@ type Config struct {
 	Token        string                       `mapstructure:"token"`
 	Output       string                       `mapstructure:"output"`
 	Debug        bool                         `mapstructure:"debug"`
+	UseMock      bool                         `mapstructure:"use_mock"`
 	Timeout      int                          `mapstructure:"timeout"`
 	Environments map[string]EnvironmentConfig `mapstructure:"environments"`
 }
@@ -25,13 +26,15 @@ type EnvironmentConfig struct {
 func Default() *Config {
 	return &Config{
 		Env:     "staging",
-		APIURL:  "https://api.staging.bank.skygenesisenterprise.com",
+		APIURL:  "http://localhost:8080",
 		Output:  "table",
 		Debug:   false,
+		UseMock: true,
 		Timeout: 30,
 		Environments: map[string]EnvironmentConfig{
-			"staging": {APIURL: "https://api.staging.bank.skygenesisenterprise.com"},
+			"staging": {APIURL: "http://localhost:8080"},
 			"prod":    {APIURL: "https://api.bank.skygenesisenterprise.com"},
+			"local":   {APIURL: "http://localhost:8080"},
 		},
 	}
 }
@@ -45,9 +48,10 @@ func New(env string) (*Config, error) {
 	configPath := filepath.Join(home, ".bank", "config.yaml")
 	viper.SetConfigFile(configPath)
 	viper.SetDefault("env", env)
-	viper.SetDefault("api_url", "https://api.staging.bank.skygenesisenterprise.com")
+	viper.SetDefault("api_url", "http://localhost:8080")
 	viper.SetDefault("output", "table")
 	viper.SetDefault("debug", false)
+	viper.SetDefault("use_mock", true)
 	viper.SetDefault("timeout", 30)
 
 	if err := viper.ReadInConfig(); err != nil {
@@ -62,6 +66,7 @@ func New(env string) (*Config, error) {
 		Token:   viper.GetString("token"),
 		Output:  viper.GetString("output"),
 		Debug:   viper.GetBool("debug"),
+		UseMock: viper.GetBool("use_mock"),
 		Timeout: viper.GetInt("timeout"),
 	}
 
@@ -87,8 +92,6 @@ func New(env string) (*Config, error) {
 }
 
 func LoadConfig(configFile string) error {
-	// Configuration is loaded in root.go PersistentPreRunE
-	// This function exists for compatibility
 	return nil
 }
 
@@ -123,4 +126,16 @@ func (c *Config) ClearToken() error {
 	viper.Set("token", "")
 
 	return viper.WriteConfig()
+}
+
+func (c *Config) GetAPIURL() string {
+	return c.APIURL
+}
+
+func (c *Config) GetToken() string {
+	return c.Token
+}
+
+func (c *Config) IsMockEnabled() bool {
+	return c.UseMock
 }

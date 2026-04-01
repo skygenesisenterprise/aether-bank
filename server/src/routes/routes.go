@@ -362,14 +362,16 @@ func SetupRoutes(router *gin.Engine, jwtService *services.JWTService) {
 		}
 
 		// ==================== BANKING API ====================
-		bankingHandler := NewBankingHandler()
+		bankAccountHandler := NewBankAccountHandler()
 		accounts := api.Group("/accounts")
 		{
-			accounts.POST("", bankingHandler.CreateAccount)
-			accounts.GET("", bankingHandler.ListAccounts)
-			accounts.GET("/:id", bankingHandler.GetAccount)
-			accounts.GET("/:id/balance", bankingHandler.GetAccountBalance)
+			accounts.POST("", bankAccountHandler.CreateAccount)
+			accounts.POST("/internal", bankAccountHandler.CreateInternalAccount)
+			accounts.GET("", bankAccountHandler.ListAccounts)
+			accounts.GET("/:id", bankAccountHandler.GetAccount)
+			accounts.GET("/:id/balance", bankAccountHandler.GetAccountBalance)
 		}
+		bankingHandler := NewBankingHandler()
 		cards := api.Group("/cards")
 		{
 			cards.POST("", bankingHandler.CreateCard)
@@ -3713,4 +3715,551 @@ func (h *WalletHandler) GetWalletPassStatus(c *gin.Context) {
 		"apple_pay":     true,
 		"google_wallet": true,
 	}})
+}
+
+// ==================== BANK ACCOUNT HANDLERS ====================
+
+type BankAccountHandler struct{}
+
+func NewBankAccountHandler() *BankAccountHandler {
+	return &BankAccountHandler{}
+}
+
+func (h *BankAccountHandler) CreateAccount(c *gin.Context) {
+	var req struct {
+		AccountType    string `json:"account_type" binding:"required"`
+		Currency       string `json:"currency"`
+		HolderName     string `json:"holder_name" binding:"required"`
+		HolderType     string `json:"holder_type" binding:"required"`
+		CountryCode    string `json:"country_code"`
+		InitialBalance int64  `json:"initial_balance"`
+		IsInternal     bool   `json:"is_internal"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.BankAccountResponse{
+			Success: false,
+			Error:   "Invalid request: " + err.Error(),
+		})
+		return
+	}
+
+	sepaService := services.NewSEPAService()
+
+	var iban, bic string
+	if req.IsInternal {
+		iban = sepaService.GenerateRandomIBAN("FR")
+		bic = "AETBFRPPXXX"
+	} else {
+		iban = sepaService.GenerateRandomIBAN(req.CountryCode)
+		bic = sepaService.GenerateRandomBIC("AETB")
+	}
+
+	if req.Currency == "" {
+		req.Currency = "EUR"
+	}
+
+	var accountType models.BankingAccountType
+	switch req.AccountType {
+	case "current":
+		accountType = models.BankingAccountTypeCurrent
+	case "business":
+		accountType = models.BankingAccountTypeBusiness
+	case "joint":
+		accountType = models.BankingAccountTypeJoint
+	case "savings":
+		accountType = models.BankingAccountTypeSavings
+	default:
+		accountType = models.BankingAccountTypeCurrent
+	}
+
+	var holderType models.HolderType
+	if req.HolderType == "business" {
+		holderType = models.HolderTypeBusiness
+	} else {
+		holderType = models.HolderTypeIndividual
+	}
+
+	var status models.BankingAccountStatus
+	if req.IsInternal {
+		status = models.BankingAccountStatusActive
+	} else {
+		status = models.BankingAccountStatusPendingKYC
+	}
+
+	account := &models.BankingAccount{
+		ID:       services.GenerateBankingID("acc"),
+		Type:     accountType,
+		Currency: req.Currency,
+		Status:   status,
+		IBAN:     iban,
+		BIC:      bic,
+		Holder: &models.AccountHolder{
+			Name: req.HolderName,
+			Type: holderType,
+		},
+		Balance: &models.AccountBalance{
+			Available: req.InitialBalance,
+			Current:   req.InitialBalance,
+			Pending:   0,
+			Overdraft: 0,
+		},
+		CreatedAt: services.GetCurrentTime(),
+		UpdatedAt: services.GetCurrentTime(),
+	}
+
+	services.SetBankingAccount(account)
+
+	accountData := models.BankAccountData{
+		ID:               account.ID,
+		AccountNumber:    iban,
+		Name:             getAccountName(accountType, req.HolderName),
+		Type:             getAccountTypeLabel(accountType),
+		AccountType:      req.AccountType,
+		Owner:            req.HolderName,
+		OwnerType:        req.HolderType,
+		OwnerCategory:    getOwnerCategory(req.IsInternal),
+		Balance:          account.Balance.Current,
+		AvailableBalance: account.Balance.Available,
+		Status:           string(account.Status),
+		Currency:         account.Currency,
+		IBAN:             iban,
+		IBANFormatted:    sepaService.FormatIBAN(iban),
+		BIC:              bic,
+		BICFormatted:     sepaService.FormatBIC(bic),
+		IsValid:          sepaService.ValidateIBAN(iban),
+		BankName:         sepaService.GetBankName(bic),
+		CreatedAt:        services.FormatTime(account.CreatedAt),
+		UpdatedAt:        services.FormatTime(account.UpdatedAt),
+	}
+
+	c.JSON(http.StatusCreated, models.BankAccountResponse{
+		Success: true,
+		Data:    &accountData,
+	})
+}
+
+func (h *BankAccountHandler) CreateInternalAccount(c *gin.Context) {
+	var req struct {
+		AccountName string `json:"account_name" binding:"required"`
+		AccountType string `json:"account_type" binding:"required"`
+		Currency    string `json:"currency"`
+		Purpose     string `json:"purpose"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.BankAccountResponse{
+			Success: false,
+			Error:   "Invalid request: " + err.Error(),
+		})
+		return
+	}
+
+	sepaService := services.NewSEPAService()
+
+	if req.Currency == "" {
+		req.Currency = "EUR"
+	}
+
+	iban := sepaService.GenerateRandomIBAN("FR")
+	bic := "AETBFRPPXXX"
+
+	var accountType models.BankingAccountType
+	switch req.AccountType {
+	case "reserve":
+		accountType = models.BankingAccountTypeCurrent
+	case "capital":
+		accountType = models.BankingAccountTypeBusiness
+	case "operational":
+		accountType = models.BankingAccountTypeCurrent
+	case "guarantee":
+		accountType = models.BankingAccountTypeSavings
+	default:
+		accountType = models.BankingAccountTypeCurrent
+	}
+
+	account := &models.BankingAccount{
+		ID:       services.GenerateBankingID("acc"),
+		Type:     accountType,
+		Currency: req.Currency,
+		Status:   models.BankingAccountStatusActive,
+		IBAN:     iban,
+		BIC:      bic,
+		Holder: &models.AccountHolder{
+			Name: req.AccountName,
+			Type: models.HolderTypeBusiness,
+		},
+		Balance: &models.AccountBalance{
+			Available: 0,
+			Current:   0,
+			Pending:   0,
+			Overdraft: 0,
+		},
+		CreatedAt: services.GetCurrentTime(),
+		UpdatedAt: services.GetCurrentTime(),
+	}
+
+	services.SetBankingAccount(account)
+
+	accountData := models.BankAccountData{
+		ID:               account.ID,
+		AccountNumber:    iban,
+		Name:             req.AccountName,
+		Type:             getInternalAccountTypeLabel(req.AccountType),
+		AccountType:      req.AccountType,
+		Owner:            "Aether Bank",
+		OwnerType:        "Banque",
+		OwnerCategory:    "bank",
+		Balance:          0,
+		AvailableBalance: 0,
+		Status:           string(account.Status),
+		Currency:         account.Currency,
+		IBAN:             iban,
+		IBANFormatted:    sepaService.FormatIBAN(iban),
+		BIC:              bic,
+		BICFormatted:     sepaService.FormatBIC(bic),
+		IsValid:          sepaService.ValidateIBAN(iban),
+		BankName:         "Aether Bank",
+		CreatedAt:        services.FormatTime(account.CreatedAt),
+		UpdatedAt:        services.FormatTime(account.UpdatedAt),
+	}
+
+	c.JSON(http.StatusCreated, models.BankAccountResponse{
+		Success: true,
+		Data:    &accountData,
+	})
+}
+
+func (h *BankAccountHandler) ListAccounts(c *gin.Context) {
+	status := c.Query("status")
+	accountType := c.Query("type")
+	category := c.Query("category")
+	search := c.Query("search")
+
+	bankingService := services.NewBankingService()
+	sepaService := services.NewSEPAService()
+
+	accounts := bankingService.ListAccountsData(status, accountType, 100, 0)
+
+	var filteredAccounts []models.BankAccountData
+	for _, acc := range accounts {
+		isInternal := acc.Holder != nil && acc.Holder.Type == models.HolderTypeBusiness &&
+			(acc.Holder.Name == "Aether Bank" || containsInternalKeyword(acc.Holder.Name))
+
+		if category == "client" && isInternal {
+			continue
+		}
+		if category == "bank" && !isInternal {
+			continue
+		}
+
+		if search != "" {
+			found := false
+			if acc.Holder != nil && (contains(acc.Holder.Name, search) || contains(acc.IBAN, search)) {
+				found = true
+			}
+			if contains(acc.IBAN, search) {
+				found = true
+			}
+			if !found {
+				continue
+			}
+		}
+
+		ownerCategory := "client"
+		if isInternal {
+			ownerCategory = "bank"
+		}
+
+		ownerType := "Particulier"
+		if acc.Holder != nil && acc.Holder.Type == models.HolderTypeBusiness {
+			ownerType = "Entreprise"
+		}
+
+		accountData := models.BankAccountData{
+			ID:               acc.ID,
+			AccountNumber:    acc.IBAN,
+			Name:             getAccountDisplayName(&acc),
+			Type:             getAccountTypeDisplayLabel(acc.Type),
+			AccountType:      string(acc.Type),
+			Owner:            getOwnerName(&acc),
+			OwnerType:        ownerType,
+			OwnerCategory:    ownerCategory,
+			Balance:          acc.Balance.Current,
+			AvailableBalance: acc.Balance.Available,
+			Status:           string(acc.Status),
+			Currency:         acc.Currency,
+			IBAN:             acc.IBAN,
+			IBANFormatted:    sepaService.FormatIBAN(acc.IBAN),
+			BIC:              acc.BIC,
+			BICFormatted:     sepaService.FormatBIC(acc.BIC),
+			IsValid:          sepaService.ValidateIBAN(acc.IBAN),
+			BankName:         sepaService.GetBankName(acc.BIC),
+			CreatedAt:        services.FormatTime(acc.CreatedAt),
+			UpdatedAt:        services.FormatTime(acc.UpdatedAt),
+		}
+
+		filteredAccounts = append(filteredAccounts, accountData)
+	}
+
+	if filteredAccounts == nil {
+		filteredAccounts = []models.BankAccountData{}
+	}
+
+	c.JSON(http.StatusOK, models.BankAccountListResponse{
+		Success: true,
+		Data:    filteredAccounts,
+		Total:   len(filteredAccounts),
+	})
+}
+
+func (h *BankAccountHandler) GetAccount(c *gin.Context) {
+	id := c.Param("id")
+
+	bankingService := services.NewBankingService()
+	sepaService := services.NewSEPAService()
+
+	account := bankingService.GetAccount(id)
+	if account == nil {
+		c.JSON(http.StatusNotFound, models.BankAccountResponse{
+			Success: false,
+			Error:   "Account not found",
+		})
+		return
+	}
+
+	isInternal := account.Holder != nil && (account.Holder.Name == "Aether Bank" || containsInternalKeyword(account.Holder.Name))
+	ownerCategory := "client"
+	if isInternal {
+		ownerCategory = "bank"
+	}
+
+	ownerType := "Particulier"
+	if account.Holder != nil && account.Holder.Type == models.HolderTypeBusiness {
+		ownerType = "Entreprise"
+	}
+
+	accountData := models.BankAccountData{
+		ID:               account.ID,
+		AccountNumber:    account.IBAN,
+		Name:             getAccountDisplayName(account),
+		Type:             getAccountTypeDisplayLabel(account.Type),
+		AccountType:      string(account.Type),
+		Owner:            getOwnerName(account),
+		OwnerType:        ownerType,
+		OwnerCategory:    ownerCategory,
+		Balance:          account.Balance.Current,
+		AvailableBalance: account.Balance.Available,
+		Status:           string(account.Status),
+		Currency:         account.Currency,
+		IBAN:             account.IBAN,
+		IBANFormatted:    sepaService.FormatIBAN(account.IBAN),
+		BIC:              account.BIC,
+		BICFormatted:     sepaService.FormatBIC(account.BIC),
+		IsValid:          sepaService.ValidateIBAN(account.IBAN),
+		BankName:         sepaService.GetBankName(account.BIC),
+		CreatedAt:        services.FormatTime(account.CreatedAt),
+		UpdatedAt:        services.FormatTime(account.UpdatedAt),
+	}
+
+	c.JSON(http.StatusOK, models.BankAccountResponse{
+		Success: true,
+		Data:    &accountData,
+	})
+}
+
+func (h *BankAccountHandler) GetAccountBalance(c *gin.Context) {
+	id := c.Param("id")
+
+	bankingService := services.NewBankingService()
+
+	balance := bankingService.GetBalance(id)
+	if balance == nil {
+		c.JSON(http.StatusNotFound, models.BalanceResponse{
+			Success: false,
+			Error:   "Account not found",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.BalanceResponse{
+		Success: true,
+		Data:    balance,
+	})
+}
+
+func (h *BankAccountHandler) ValidateSEPA(c *gin.Context) {
+	var req struct {
+		IBAN string `json:"iban" binding:"required"`
+		BIC  string `json:"bic"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.LedgerResponse{
+			Success: false,
+			Error:   "Invalid request",
+		})
+		return
+	}
+
+	sepaService := services.NewSEPAService()
+
+	isValid, errorMsg := sepaService.ValidateSEPAData(req.IBAN, req.BIC)
+
+	c.JSON(http.StatusOK, models.LedgerResponse{
+		Success: isValid,
+		Data: map[string]interface{}{
+			"is_valid": isValid,
+			"error":    errorMsg,
+			"iban":     req.IBAN,
+			"bic":      req.BIC,
+		},
+	})
+}
+
+func (h *BankAccountHandler) GenerateIBAN(c *gin.Context) {
+	var req struct {
+		CountryCode string `json:"country_code"`
+		BankCode    string `json:"bank_code"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		req.CountryCode = "FR"
+		req.BankCode = ""
+	}
+
+	sepaService := services.NewSEPAService()
+
+	iban := sepaService.GenerateRandomIBAN(req.CountryCode)
+	bic := sepaService.GenerateRandomBIC(req.BankCode)
+
+	c.JSON(http.StatusOK, models.LedgerResponse{
+		Success: true,
+		Data: map[string]string{
+			"iban":           iban,
+			"iban_formatted": sepaService.FormatIBAN(iban),
+			"bic":            bic,
+			"bic_formatted":  sepaService.FormatBIC(bic),
+			"is_valid":       "true",
+			"country_code":   req.CountryCode,
+		},
+	})
+}
+
+// Helper functions
+func getAccountName(accountType models.BankingAccountType, holderName string) string {
+	switch accountType {
+	case models.BankingAccountTypeCurrent:
+		return "Compte Courant - " + holderName
+	case models.BankingAccountTypeBusiness:
+		return "Compte Professionnel - " + holderName
+	case models.BankingAccountTypeJoint:
+		return "Compte Joint - " + holderName
+	case models.BankingAccountTypeSavings:
+		return "Livret Épargne - " + holderName
+	default:
+		return "Compte - " + holderName
+	}
+}
+
+func getOwnerCategory(isInternal bool) string {
+	if isInternal {
+		return "bank"
+	}
+	return "client"
+}
+
+func getAccountTypeLabel(accountType models.BankingAccountType) string {
+	switch accountType {
+	case models.BankingAccountTypeCurrent:
+		return "Compte Courant"
+	case models.BankingAccountTypeBusiness:
+		return "Compte Professionnel"
+	case models.BankingAccountTypeJoint:
+		return "Compte Joint"
+	case models.BankingAccountTypeSavings:
+		return "Livret Épargne"
+	default:
+		return "Compte"
+	}
+}
+
+func getInternalAccountTypeLabel(accountType string) string {
+	switch accountType {
+	case "reserve":
+		return "Compte Réserve"
+	case "capital":
+		return "Compte Capital"
+	case "operational":
+		return "Compte Opérationnel"
+	case "guarantee":
+		return "Compte Garanti"
+	case "correspondent":
+		return "Compte Correspondant"
+	default:
+		return "Compte Interne"
+	}
+}
+
+func getAccountTypeDisplayLabel(accountType models.BankingAccountType) string {
+	switch accountType {
+	case models.BankingAccountTypeCurrent:
+		return "Compte Courant"
+	case models.BankingAccountTypeBusiness:
+		return "Compte Pro"
+	case models.BankingAccountTypeJoint:
+		return "Compte Joint"
+	case models.BankingAccountTypeSavings:
+		return "Livret Épargne"
+	default:
+		return "Compte"
+	}
+}
+
+func getAccountDisplayName(account *models.BankingAccount) string {
+	if account.Holder == nil {
+		return "Compte #" + account.ID
+	}
+
+	switch account.Type {
+	case models.BankingAccountTypeCurrent:
+		return "Compte Courant - " + account.Holder.Name
+	case models.BankingAccountTypeBusiness:
+		return "Compte Pro - " + account.Holder.Name
+	case models.BankingAccountTypeJoint:
+		return "Compte Joint - " + account.Holder.Name
+	case models.BankingAccountTypeSavings:
+		return "Livret Épargne - " + account.Holder.Name
+	default:
+		return "Compte - " + account.Holder.Name
+	}
+}
+
+func getOwnerName(account *models.BankingAccount) string {
+	if account.Holder == nil {
+		return "Unknown"
+	}
+	return account.Holder.Name
+}
+
+func containsInternalKeyword(name string) bool {
+	keywords := []string{"Réserve", "Fonds", "Opérationnel", "Garanti", "Aether", "BCE", "Tier"}
+	for _, kw := range keywords {
+		if contains(name, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+func contains(s, substr string) bool {
+	if len(s) < len(substr) {
+		return false
+	}
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

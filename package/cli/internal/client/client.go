@@ -1,8 +1,6 @@
 package client
 
-import (
-	"time"
-)
+import "time"
 
 type Client interface {
 	Login(email, password string) (*LoginResponse, error)

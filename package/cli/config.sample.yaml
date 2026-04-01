@@ -1,14 +1,14 @@
-# Sample configuration for Aether Bank CLI
+# Aether Bank CLI Configuration
 # Save this to ~/.bank/config.yaml
 
-env: staging
+# Environment: staging, prod, local
+env: local
 
-# API endpoints for different environments
-environments:
-  staging:
-    api_url: "https://api.staging.bank.skygenesisenterprise.com"
-  prod:
-    api_url: "https://api.bank.skygenesisenterprise.com"
+# API URL (default for local development)
+api_url: "http://localhost:8080"
+
+# Use mock client (true) or real API (false)
+use_mock: true
 
 # Output format: table or json
 output: table
@@ -18,6 +18,15 @@ debug: false
 
 # Request timeout in seconds
 timeout: 30
+
+# API endpoints for different environments
+environments:
+  local:
+    api_url: "http://localhost:8080"
+  staging:
+    api_url: "https://api.staging.bank.skygenesisenterprise.com"
+  prod:
+    api_url: "https://api.bank.skygenesisenterprise.com"
 
 # Token is automatically saved after login
 # token: ""

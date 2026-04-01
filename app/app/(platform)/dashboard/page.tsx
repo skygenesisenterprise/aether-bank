@@ -8,6 +8,7 @@ import {
   Wallet,
   CreditCard,
   TrendingUp,
+  TrendingDown,
   DollarSign,
   Activity,
   ArrowUpRight,
@@ -20,6 +21,17 @@ import {
   PiggyBank,
   BarChart3,
   Calendar,
+  Clock,
+  ShieldCheck,
+  Zap,
+  Eye,
+  MoreHorizontal,
+  Download,
+  RefreshCw,
+  Target,
+  Award,
+  AlertTriangle,
+  Info,
 } from "lucide-react";
 import {
   Area,
@@ -31,12 +43,16 @@ import {
   Pie,
   Cell,
   ResponsiveContainer,
+  Tooltip,
+  Bar,
+  BarChart,
 } from "recharts";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Progress } from "@/components/ui/progress";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -130,21 +146,47 @@ const alerts = [
 ];
 
 const quickActions = [
-  { label: "Nouveau client", href: "/platform/clients/new", icon: Plus, color: "bg-indigo-500" },
   {
-    label: "Transactions",
-    href: "/platform/transactions",
-    icon: ArrowLeftRight,
-    color: "bg-purple-500",
+    label: "Nouveau client",
+    href: "/dashboard/clients",
+    icon: Plus,
+    color: "from-indigo-500 to-indigo-600",
   },
-  { label: "Alertes", href: "/platform/alerts", icon: Bell, color: "bg-orange-500" },
-  { label: "Analytics", href: "/platform/analytics", icon: BarChart3, color: "bg-blue-500" },
+  {
+    label: "Nouveau virement",
+    href: "/dashboard/transactions",
+    icon: ArrowLeftRight,
+    color: "from-purple-500 to-purple-600",
+  },
+  {
+    label: "Alertes",
+    href: "/dashboard/notifications",
+    icon: Bell,
+    color: "from-amber-500 to-amber-600",
+  },
+  {
+    label: "Analytics",
+    href: "/dashboard/analytics",
+    icon: BarChart3,
+    color: "from-cyan-500 to-cyan-600",
+  },
 ];
 
-const chartConfig = {
-  volume: { label: "Volume (€)", color: "oklch(0.6 0.2 25)" },
-  transactions: { label: "Transactions", color: "oklch(0.7 0.15 250)" },
-};
+const cardActivityData = [
+  { month: "Jan", issued: 420, active: 380 },
+  { month: "Fév", issued: 480, active: 430 },
+  { month: "Mar", issued: 510, active: 470 },
+  { month: "Avr", issued: 550, active: 510 },
+  { month: "Mai", issued: 620, active: 580 },
+  { month: "Juin", issued: 680, active: 640 },
+];
+
+const complianceData = [
+  { name: "KYC Vérifiés", value: 94, target: 95, status: "warning" },
+  { name: "AML Conformité", value: 98, target: 95, status: "success" },
+  { name: "Documents Validés", value: 87, target: 90, status: "warning" },
+  { name: "Audits Réussis", value: 100, target: 95, status: "success" },
+];
 
 function formatCurrency(amount: number) {
   return amount.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
@@ -156,22 +198,47 @@ function formatNumber(num: number) {
   return num.toString();
 }
 
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-3">
+        <p className="font-semibold text-sm mb-2 text-gray-900 dark:text-white">{label}</p>
+        {payload.map((entry: any, index: number) => (
+          <p key={index} className="text-sm" style={{ color: entry.color }}>
+            {entry.name}:{" "}
+            {entry.name.includes("Volume") || entry.name.includes("volume")
+              ? formatCurrency(entry.value)
+              : entry.value.toLocaleString("fr-FR")}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
 export default function PlatformDashboardPage() {
   const [timeRange, setTimeRange] = useState("7d");
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50/50 min-h-screen">
       {/* Page Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Dashboard Platform</h1>
-          <p className="text-sm text-muted-foreground">
-            Vue d&apos;ensemble de la plateforme Aether Bank
+          <div className="flex items-center gap-3 mb-1">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+            <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0">
+              <Zap className="h-3 w-3 mr-1" />
+              En direct
+            </Badge>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Vue d&apos;ensemble complète de l&apos;activité Aether Bank
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-44 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
               <Calendar className="mr-2 h-4 w-4" />
               <SelectValue />
             </SelectTrigger>
@@ -182,149 +249,179 @@ export default function PlatformDashboardPage() {
               <SelectItem value="90d">3 derniers mois</SelectItem>
             </SelectContent>
           </Select>
+          <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">
+            <Download className="mr-2 h-4 w-4" />
+            Exporter
+          </Button>
         </div>
       </div>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {quickActions.map((action) => (
-          <Button
-            key={action.label}
-            variant="outline"
-            className="h-auto py-4 flex flex-col items-center gap-2"
-            asChild
-          >
-            <Link href={action.href}>
-              <div className={`p-2 rounded-lg ${action.color}`}>
-                <action.icon className="h-4 w-4 text-white" />
+          <Link key={action.label} href={action.href}>
+            <div className="group flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-600 hover:shadow-lg hover:shadow-indigo-500/10 transition-all cursor-pointer">
+              <div className={`p-3 rounded-xl bg-gradient-to-br ${action.color} shadow-lg`}>
+                <action.icon className="h-5 w-5 text-white" />
               </div>
-              <span className="text-sm">{action.label}</span>
-            </Link>
-          </Button>
+              <div>
+                <p className="font-semibold text-sm text-gray-900 dark:text-white">
+                  {action.label}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Accès rapide</p>
+              </div>
+            </div>
+          </Link>
         ))}
       </div>
 
-      {/* Stats Cards Row 1 */}
+      {/* KPI Cards Principaux */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950/30 dark:to-gray-800">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardDescription>Total Clients</CardDescription>
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <CardDescription className="text-indigo-700 dark:text-indigo-300 font-medium">
+                Total Clients
+              </CardDescription>
+              <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/50">
+                <Users className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">24,847</div>
-            <div className="flex items-center gap-1 text-xs text-green-600 mt-1">
+            <div className="text-3xl font-bold text-gray-900 dark:text-white">24,847</div>
+            <div className="flex items-center gap-1 text-xs text-emerald-600 mt-2">
               <TrendingUp className="h-3 w-3" />
-              +12% ce mois
+              <span className="font-semibold">+12%</span>
+              <span className="text-gray-500 dark:text-gray-400">ce mois</span>
             </div>
           </CardContent>
         </Card>
-        <Card>
+
+        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-purple-50 to-white dark:from-purple-950/30 dark:to-gray-800">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardDescription>Comptes Actifs</CardDescription>
-              <Wallet className="h-4 w-4 text-muted-foreground" />
+              <CardDescription className="text-purple-700 dark:text-purple-300 font-medium">
+                Comptes Actifs
+              </CardDescription>
+              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/50">
+                <Wallet className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">18,293</div>
-            <div className="flex items-center gap-1 text-xs text-green-600 mt-1">
+            <div className="text-3xl font-bold text-gray-900 dark:text-white">18,293</div>
+            <div className="flex items-center gap-1 text-xs text-emerald-600 mt-2">
               <TrendingUp className="h-3 w-3" />
-              +8.5% ce mois
+              <span className="font-semibold">+8.5%</span>
+              <span className="text-gray-500 dark:text-gray-400">ce mois</span>
             </div>
           </CardContent>
         </Card>
-        <Card>
+
+        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-cyan-50 to-white dark:from-cyan-950/30 dark:to-gray-800">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardDescription>Transactions Jour</CardDescription>
-              <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+              <CardDescription className="text-cyan-700 dark:text-cyan-300 font-medium">
+                Transactions Jour
+              </CardDescription>
+              <div className="p-2 rounded-lg bg-cyan-100 dark:bg-cyan-900/50">
+                <ArrowLeftRight className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">124,847</div>
-            <div className="flex items-center gap-1 text-xs text-green-600 mt-1">
+            <div className="text-3xl font-bold text-gray-900 dark:text-white">124,847</div>
+            <div className="flex items-center gap-1 text-xs text-emerald-600 mt-2">
               <TrendingUp className="h-3 w-3" />
-              +15% ce mois
+              <span className="font-semibold">+15%</span>
+              <span className="text-gray-500 dark:text-gray-400">ce mois</span>
             </div>
           </CardContent>
         </Card>
-        <Card>
+
+        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/30 dark:to-gray-800">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardDescription>Volume Total</CardDescription>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <CardDescription className="text-emerald-700 dark:text-emerald-300 font-medium">
+                Volume Total
+              </CardDescription>
+              <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/50">
+                <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">€4.2M</div>
-            <div className="flex items-center gap-1 text-xs text-green-600 mt-1">
+            <div className="text-3xl font-bold text-gray-900 dark:text-white">€4.2M</div>
+            <div className="flex items-center gap-1 text-xs text-emerald-600 mt-2">
               <TrendingUp className="h-3 w-3" />
-              +22% ce mois
+              <span className="font-semibold">+22%</span>
+              <span className="text-gray-500 dark:text-gray-400">ce mois</span>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Stats Cards Row 2 */}
+      {/* KPI Cards Secondaires */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription>Cartes Émises</CardDescription>
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
+              <CreditCard className="h-4 w-4 text-gray-500" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8,420</div>
-            <div className="flex items-center gap-1 text-xs text-green-600 mt-1">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">8,420</div>
+            <div className="flex items-center gap-1 text-xs text-emerald-600 mt-1">
               <TrendingUp className="h-3 w-3" />
               +5.2% ce mois
             </div>
           </CardContent>
         </Card>
-        <Card>
+
+        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription>Virements SEPA</CardDescription>
-              <Globe className="h-4 w-4 text-muted-foreground" />
+              <Globe className="h-4 w-4 text-gray-500" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">€2.8M</div>
-            <div className="flex items-center gap-1 text-xs text-green-600 mt-1">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">€2.8M</div>
+            <div className="flex items-center gap-1 text-xs text-emerald-600 mt-1">
               <TrendingUp className="h-3 w-3" />
               +18% ce mois
             </div>
           </CardContent>
         </Card>
-        <Card>
+
+        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription>Taux de Réussite</CardDescription>
-              <Activity className="h-4 w-4 text-muted-foreground" />
+              <Activity className="h-4 w-4 text-gray-500" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">99.7%</div>
-            <div className="flex items-center gap-1 text-xs text-green-600 mt-1">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">99.7%</div>
+            <div className="flex items-center gap-1 text-xs text-emerald-600 mt-1">
               <TrendingUp className="h-3 w-3" />
               +0.2% ce mois
             </div>
           </CardContent>
         </Card>
-        <Card>
+
+        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription>Épargne Totale</CardDescription>
-              <PiggyBank className="h-4 w-4 text-muted-foreground" />
+              <PiggyBank className="h-4 w-4 text-gray-500" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">€1.8M</div>
-            <div className="flex items-center gap-1 text-xs text-green-600 mt-1">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">€1.8M</div>
+            <div className="flex items-center gap-1 text-xs text-emerald-600 mt-1">
               <TrendingUp className="h-3 w-3" />
               +3.8% ce mois
             </div>
@@ -335,21 +432,21 @@ export default function PlatformDashboardPage() {
       {/* Charts Row */}
       <div className="grid gap-6 lg:grid-cols-7">
         {/* Transaction Volume Chart */}
-        <Card className="lg:col-span-4">
+        <Card className="lg:col-span-4 border-0 shadow-sm">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-base">Volume des Transactions</CardTitle>
-                <CardDescription>Volume et nombre de transactions cette semaine</CardDescription>
+                <CardTitle className="text-lg font-semibold">Volume des Transactions</CardTitle>
+                <CardDescription>Évolution cette semaine</CardDescription>
               </div>
               <div className="flex items-center gap-4 text-sm">
                 <div className="flex items-center gap-1.5">
-                  <div className="h-2.5 w-2.5 rounded-full bg-primary" />
-                  <span className="text-muted-foreground">Volume</span>
+                  <div className="h-2.5 w-2.5 rounded-full bg-indigo-500" />
+                  <span className="text-gray-600 dark:text-gray-400">Volume</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="h-2.5 w-2.5 rounded-full bg-[oklch(0.7_0.15_250)]" />
-                  <span className="text-muted-foreground">Transactions</span>
+                  <div className="h-2.5 w-2.5 rounded-full bg-purple-500" />
+                  <span className="text-gray-600 dark:text-gray-400">Transactions</span>
                 </div>
               </div>
             </div>
@@ -362,28 +459,30 @@ export default function PlatformDashboardPage() {
               >
                 <defs>
                   <linearGradient id="fillVolume" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--color-volume)" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="var(--color-volume)" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                 <XAxis
                   dataKey="date"
                   tickLine={false}
                   axisLine={false}
-                  tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                  tick={{ fontSize: 12, fill: "#6b7280" }}
                 />
                 <YAxis
                   tickLine={false}
                   axisLine={false}
-                  tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                  tick={{ fontSize: 12, fill: "#6b7280" }}
                   tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                 />
+                <Tooltip content={<CustomTooltip />} />
                 <Area
                   type="monotone"
                   dataKey="volume"
-                  stroke="var(--color-volume)"
-                  strokeWidth={2}
+                  name="Volume (€)"
+                  stroke="#6366f1"
+                  strokeWidth={3}
                   fill="url(#fillVolume)"
                 />
               </AreaChart>
@@ -392,11 +491,11 @@ export default function PlatformDashboardPage() {
         </Card>
 
         {/* Account Distribution */}
-        <Card className="lg:col-span-3">
+        <Card className="lg:col-span-3 border-0 shadow-sm">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-base">Répartition des Comptes</CardTitle>
+                <CardTitle className="text-lg font-semibold">Répartition des Comptes</CardTitle>
                 <CardDescription>Par type de compte</CardDescription>
               </div>
             </div>
@@ -408,25 +507,28 @@ export default function PlatformDashboardPage() {
                   data={accountTypeData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={2}
+                  innerRadius={55}
+                  outerRadius={85}
+                  paddingAngle={3}
                   dataKey="value"
                 >
                   {accountTypeData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
+                <Tooltip />
               </PieChart>
             </ResponsiveContainer>
-            <div className="space-y-2 mt-4">
+            <div className="space-y-3 mt-4">
               {accountTypeData.map((item) => (
                 <div key={item.name} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span className="text-sm">{item.name}</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">{item.name}</span>
                   </div>
-                  <span className="text-sm font-medium">{item.value}%</span>
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {item.value}%
+                  </span>
                 </div>
               ))}
             </div>
@@ -434,18 +536,116 @@ export default function PlatformDashboardPage() {
         </Card>
       </div>
 
-      {/* Second Row */}
+      {/* Activity & Compliance Row */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Card Activity */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg font-semibold">Activité Cartes</CardTitle>
+                <CardDescription>Émissions vs actives</CardDescription>
+              </div>
+              <CreditCard className="h-5 w-5 text-gray-400" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={cardActivityData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                <XAxis
+                  dataKey="month"
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 11, fill: "#6b7280" }}
+                />
+                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#6b7280" }} />
+                <Tooltip />
+                <Bar dataKey="issued" name="Émises" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="active" name="Actives" fill="#10b981" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Compliance Status */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg font-semibold">Conformité</CardTitle>
+                <CardDescription>Indicateurs réglementaires</CardDescription>
+              </div>
+              <ShieldCheck className="h-5 w-5 text-gray-400" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {complianceData.map((item) => (
+              <div key={item.name} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {item.name}
+                  </span>
+                  <span
+                    className={`text-sm font-semibold ${item.value >= item.target ? "text-emerald-600" : "text-amber-600"}`}
+                  >
+                    {item.value}%
+                  </span>
+                </div>
+                <Progress value={item.value} className="h-2" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Performance Score */}
+        <Card className="border-0 shadow-sm bg-gradient-to-br from-indigo-600 to-purple-700 text-white">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg font-semibold text-white">
+                  Score Performance
+                </CardTitle>
+                <CardDescription className="text-indigo-200">Global ce mois</CardDescription>
+              </div>
+              <Award className="h-5 w-5 text-indigo-200" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="text-center">
+              <div className="text-5xl font-bold">94</div>
+              <div className="text-sm text-indigo-200 mt-1">/ 100 points</div>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-indigo-200">Uptime</span>
+                <span className="font-semibold">99.9%</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-indigo-200">Satisfaction</span>
+                <span className="font-semibold">4.8/5</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-indigo-200">Temps réponse</span>
+                <span className="font-semibold">120ms</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Transactions & Alerts Row */}
       <div className="grid gap-6 lg:grid-cols-7">
         {/* Recent Transactions */}
-        <Card className="lg:col-span-4">
+        <Card className="lg:col-span-4 border-0 shadow-sm">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-base">Transactions Récentes</CardTitle>
-                <CardDescription>Dernières opérations sur la plateforme</CardDescription>
+                <CardTitle className="text-lg font-semibold">Transactions Récentes</CardTitle>
+                <CardDescription>Dernières opérations</CardDescription>
               </div>
               <Button variant="ghost" size="sm" asChild>
-                <Link href="/platform/transactions" className="gap-1">
+                <Link href="/dashboard/transactions" className="gap-1">
                   Voir tout
                   <ArrowUpRight className="h-3.5 w-3.5" />
                 </Link>
@@ -453,41 +653,52 @@ export default function PlatformDashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="divide-y divide-border">
+            <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {recentTransactions.map((transaction) => (
-                <div key={transaction.id} className="flex items-center gap-4 px-6 py-4">
+                <div
+                  key={transaction.id}
+                  className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                >
                   <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      transaction.type === "credit" ? "bg-green-100" : "bg-gray-100"
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                      transaction.type === "credit"
+                        ? "bg-emerald-100 dark:bg-emerald-900/30"
+                        : "bg-gray-100 dark:bg-gray-700"
                     }`}
                   >
                     {transaction.type === "credit" ? (
-                      <ArrowUpRight className="w-5 h-5 text-green-600 rotate-45" />
+                      <ArrowUpRight className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                     ) : (
-                      <ArrowLeftRight className="w-5 h-5 text-gray-600" />
+                      <ArrowLeftRight className="w-5 h-5 text-gray-600 dark:text-gray-400" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="font-medium text-sm truncate">{transaction.name}</p>
+                      <p className="font-medium text-sm text-gray-900 dark:text-white truncate">
+                        {transaction.name}
+                      </p>
                       {transaction.status === "pending" && (
-                        <Badge variant="outline" className="text-[10px]">
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] bg-amber-50 text-amber-700 border-amber-200"
+                        >
+                          <Clock className="h-3 w-3 mr-1" />
                           En attente
                         </Badge>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
                       {transaction.account} • {transaction.date}
                     </p>
                   </div>
                   <div className="text-right">
                     <p
-                      className={`font-medium text-sm ${transaction.type === "credit" ? "text-green-600" : ""}`}
+                      className={`font-semibold text-sm ${transaction.type === "credit" ? "text-emerald-600 dark:text-emerald-400" : "text-gray-900 dark:text-white"}`}
                     >
                       {transaction.type === "credit" ? "+" : ""}
                       {formatCurrency(transaction.amount)}
                     </p>
-                    <p className="text-xs text-muted-foreground capitalize">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
                       {transaction.status === "completed" ? "Validé" : "En attente"}
                     </p>
                   </div>
@@ -500,42 +711,47 @@ export default function PlatformDashboardPage() {
         {/* Alerts & Activity */}
         <div className="space-y-6 lg:col-span-3">
           {/* Alerts */}
-          <Card>
+          <Card className="border-0 shadow-sm">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-base">Alertes</CardTitle>
+                  <CardTitle className="text-lg font-semibold">Alertes</CardTitle>
                   <CardDescription>Notifications importantes</CardDescription>
                 </div>
-                <Badge variant="outline" className="bg-orange-50 text-orange-600">
+                <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-0">
                   3 nouvelles
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="divide-y divide-border">
+              <div className="divide-y divide-gray-100 dark:divide-gray-800">
                 {alerts.map((alert, index) => (
-                  <div key={index} className="flex items-start gap-3 px-6 py-3">
+                  <div
+                    key={index}
+                    className="flex items-start gap-3 px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                  >
                     <div
-                      className={`mt-0.5 ${
+                      className={`mt-0.5 p-1.5 rounded-lg ${
                         alert.type === "warning"
-                          ? "text-orange-500"
+                          ? "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
                           : alert.type === "success"
-                            ? "text-green-500"
-                            : "text-blue-500"
+                            ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
+                            : "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
                       }`}
                     >
                       {alert.type === "warning" ? (
-                        <AlertCircle className="w-4 h-4" />
+                        <AlertTriangle className="w-4 h-4" />
                       ) : alert.type === "success" ? (
                         <CheckCircle className="w-4 h-4" />
                       ) : (
-                        <Activity className="w-4 h-4" />
+                        <Info className="w-4 h-4" />
                       )}
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm">{alert.message}</p>
-                      <p className="text-xs text-muted-foreground">{alert.time}</p>
+                      <p className="text-sm text-gray-900 dark:text-white">{alert.message}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        {alert.time}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -544,15 +760,15 @@ export default function PlatformDashboardPage() {
           </Card>
 
           {/* Recent Clients */}
-          <Card>
+          <Card className="border-0 shadow-sm">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-base">Nouveaux Clients</CardTitle>
+                  <CardTitle className="text-lg font-semibold">Nouveaux Clients</CardTitle>
                   <CardDescription>Inscriptions récentes</CardDescription>
                 </div>
                 <Button variant="ghost" size="sm" asChild>
-                  <Link href="/platform/clients" className="gap-1">
+                  <Link href="/dashboard/clients" className="gap-1">
                     Voir tout
                     <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
@@ -560,11 +776,14 @@ export default function PlatformDashboardPage() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="divide-y divide-border">
+              <div className="divide-y divide-gray-100 dark:divide-gray-800">
                 {recentClients.map((client, index) => (
-                  <div key={index} className="flex items-center gap-3 px-6 py-3">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                  <div
+                    key={index}
+                    className="flex items-center gap-3 px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                  >
+                    <Avatar className="h-9 w-9">
+                      <AvatarFallback className="text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold">
                         {client.name
                           .split(" ")
                           .map((n) => n[0])
@@ -573,14 +792,19 @@ export default function PlatformDashboardPage() {
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{client.name}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {client.name}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
                         {client.type} • {client.date}
                       </p>
                     </div>
                     <Badge
-                      variant={client.status === "verified" ? "default" : "secondary"}
-                      className={client.status === "verified" ? "bg-green-100 text-green-700" : ""}
+                      className={
+                        client.status === "verified"
+                          ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0"
+                          : "bg-amber-100 text-amber-700 hover:bg-amber-100 border-0"
+                      }
                     >
                       {client.status === "verified" ? "Vérifié" : "En attente"}
                     </Badge>
