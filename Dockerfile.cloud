@@ -30,7 +30,7 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # ── Prisma ─────────────────────────────────────────────────────────────────────
 COPY server/prisma/ ./prisma/
-RUN npx prisma generate --config=./prisma.config.ts
+RUN cd prisma && npm install --silent && npx prisma generate
 
 # ── Build Next.js ─────────────────────────────────────────────────────────────
 COPY app/ ./app/
@@ -51,9 +51,8 @@ RUN apk add --no-cache \
     wget \
     nodejs \
     npm \
-    postgresql16 \
-    postgresql16-client \
-    su-exec
+    postgresql-client \
+    openssl
 
 # ── Go Runtime (pour le serveur API) ───────────────────────────────────────────
 RUN ARCH=$(uname -m) && \
@@ -73,30 +72,6 @@ ENV GOPATH="/go"
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate && \
     ln -sf /root/.local/share/corepack/pnpm /usr/local/bin/pnpm
 
-# ── PostgreSQL Setup (Embedded) ───────────────────────────────────────────────
-RUN mkdir -p /var/lib/postgresql/data /run/postgresql /var/log/postgresql && \
-    chown -R postgres:postgres \
-      /var/lib/postgresql \
-      /run/postgresql \
-      /var/log/postgresql && \
-    chmod 700 /var/lib/postgresql/data
-
-RUN mkdir -p /etc/postgresql/16
-COPY <<'EOF' /etc/postgresql/16/pg_hba.conf
-local   all       all                   trust
-host    all       all   127.0.0.1/32    scram-sha-256
-EOF
-
-COPY <<'EOF' /etc/postgresql/16/postgresql.conf
-listen_addresses = '127.0.0.1'
-port = 5432
-max_connections = 50
-shared_buffers = 64MB
-log_directory = '/var/log/postgresql'
-log_filename = 'postgresql.log'
-logging_collector = on
-EOF
-
 WORKDIR /app
 
 # ── Next.js Production Build ───────────────────────────────────────────────────
@@ -109,14 +84,14 @@ COPY --from=node-builder /app/app/messages ./messages
 # ── Node Modules & Prisma ───────────────────────────────────────────────────────
 COPY --from=node-builder /app/node_modules ./node_modules
 COPY --from=node-builder /app/prisma/      ./prisma/
-COPY --from=node-builder /app/prisma.config.ts ./prisma.config.ts
 
 # ── Go API Server Binary ───────────────────────────────────────────────────────
 COPY --from=go-builder /app/server/etheriatimes-api ./server/etheriatimes-api
 
 # ── Entry Point ────────────────────────────────────────────────────────────────
 COPY entrypoint-cloud.sh /entrypoint-cloud.sh
-RUN chmod +x /entrypoint-cloud.sh
+COPY scripts/ /app/scripts/
+RUN chmod +x /entrypoint-cloud.sh /app/scripts/wait-for-db.sh
 
 EXPOSE 3000 8080
 

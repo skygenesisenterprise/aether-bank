@@ -12,12 +12,14 @@ export NODE_ENV="${NODE_ENV:-production}"
 # Configuration
 # =============================================================================
 
+DB_HOST="${DB_HOST:-db}"
+DB_PORT="${DB_PORT:-5432}"
+DB_USER="${DB_USER:-aether}"
+DB_NAME="${DB_NAME:-etheria_account}"
+DB_PASSWORD="${DB_PASSWORD:-${POSTGRES_PASSWORD:-password}}"
+
 FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 API_PORT="${API_PORT:-8080}"
-
-POSTGRES_USER="${POSTGRES_USER:-aether}"
-POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-password}"
-POSTGRES_DB="${POSTGRES_DB:-etheria_account}"
 
 # =============================================================================
 # Logging Functions
@@ -47,77 +49,44 @@ display_header() {
     echo ""
     echo "╔══════════════════════════════════════════════════════════════════════╗"
     echo "║                    Aether Bank System                             ║"
-    echo "║               Enterprise Account Management                       ║"
+    echo "║               Enterprise Account Management                        ║"
     echo "║                   Version 1.0.0-production                        ║"
     echo "╚══════════════════════════════════════════════════════════════════════╝"
     echo ""
     log_info "Frontend: http://localhost:${FRONTEND_PORT}"
     log_info "API:      http://localhost:${API_PORT}"
+    log_info "Database: ${DB_HOST}:${DB_PORT}/${DB_NAME}"
     echo ""
 }
 
 # =============================================================================
-# Database Setup (Embedded PostgreSQL)
+# Database Setup (External PostgreSQL)
 # =============================================================================
 
-init_database() {
-    log_info "Initializing embedded PostgreSQL..."
+wait_for_database() {
+    log_info "Waiting for database to be ready..."
 
-    # Check if PostgreSQL is already initialized
-    if [ -f "/var/lib/postgresql/data/PG_VERSION" ]; then
-        log_success "PostgreSQL already initialized"
-        return 0
-    fi
+    MAX_RETRIES=60
+    RETRY_COUNT=0
 
-    # Initialize PostgreSQL data directory
-    mkdir -p /var/lib/postgresql/data
-    chown -R postgres:postgres /var/lib/postgresql
+    while ! PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c '\q' 2>/dev/null; do
+        RETRY_COUNT=$((RETRY_COUNT + 1))
 
-    su - postgres -c "initdb -D /var/lib/postgresql/data" 2>/dev/null || true
+        if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+            log_error "Database not available after ${MAX_RETRIES} attempts"
+            return 1
+        fi
 
-    # Start PostgreSQL temporarily for setup
-    su - postgres -c "pg_ctl -D /var/lib/postgresql/data -l /var/lib/postgresql/logfile start" &
-    POSTGRES_PID=$!
+        log_info "Waiting for database... (${RETRY_COUNT}/${MAX_RETRIES})"
+        sleep 2
+    done
 
-    # Wait for PostgreSQL to start
-    sleep 3
-
-    # Create database and user
-    su - postgres -c "psql -c \"CREATE USER ${POSTGRES_USER} WITH PASSWORD '${POSTGRES_PASSWORD}' SUPERUSER;\"" 2>/dev/null || true
-    su - postgres -c "psql -c \"CREATE DATABASE ${POSTGRES_DB} OWNER ${POSTGRES_USER};\"" 2>/dev/null || true
-
-    # Stop temporary PostgreSQL
-    su - postgres -c "pg_ctl -D /var/lib/postgresql/data stop" 2>/dev/null || true
-
-    log_success "PostgreSQL initialized"
-    return 0
-}
-
-start_postgres() {
-    log_info "Starting PostgreSQL..."
-
-    # Start PostgreSQL in background
-    su - postgres -c "pg_ctl -D /var/lib/postgresql/data -l /var/lib/postgresql/logfile -o '-k /tmp' start" &
-
-    # Wait for PostgreSQL to be ready
-    sleep 3
-
-    # Verify connection
-    if su - postgres -c "psql -l" > /dev/null 2>&1; then
-        log_success "PostgreSQL is ready"
-    else
-        log_error "PostgreSQL failed to start"
-        return 1
-    fi
-
+    log_success "Database connected"
     return 0
 }
 
 run_migrations() {
     log_info "Running database migrations..."
-
-    # Set DATABASE_URL for migrations
-    export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:5432/${POSTGRES_DB}"
 
     PRISMA_DIR="/app/server/prisma"
 
@@ -126,10 +95,11 @@ run_migrations() {
 
         if [ -f "schema.prisma" ]; then
             log_info "Generating Prisma client..."
-            npx prisma generate 2>/dev/null || log_warn "Prisma generate failed"
+            PGPASSWORD="$DB_PASSWORD" npx prisma generate 2>/dev/null || log_warn "Prisma generate failed"
 
             log_info "Running database migrations..."
-            npx prisma db push --accept-data-loss 2>/dev/null || log_warn "Prisma db push failed"
+            PGPASSWORD="$DB_PASSWORD" DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}" \
+                npx prisma db push --accept-data-loss 2>/dev/null || log_warn "Prisma db push failed"
         fi
 
         log_success "Database migrations complete"
@@ -147,22 +117,18 @@ start_frontend() {
 
     cd /app/app
 
-    # Use production build
     export PORT="$FRONTEND_PORT"
     export NEXT_PUBLIC_BASE_PATH=""
     export NEXT_TELEMETRY_DISABLED=1
 
-    # Start Next.js production server
     node server.js &
     NEXT_PID=$!
     echo "$NEXT_PID" > /tmp/next.pid
 
     log_info "Next.js started (PID: $NEXT_PID)"
 
-    # Wait for frontend to be ready
     sleep 3
 
-    # Verify it's running
     if kill -0 "$NEXT_PID" 2>/dev/null; then
         log_success "Next.js is ready"
     else
@@ -178,21 +144,17 @@ start_api() {
 
     cd /app
 
-    # Set environment for production
     export SERVER_PORT="$API_PORT"
     export ENVIRONMENT="production"
 
-    # Start Go API server (pre-built binary)
     ./server/etheriatimes-api &
     API_PID=$!
     echo "$API_PID" > /tmp/api.pid
 
     log_info "Go API server started (PID: $API_PID)"
 
-    # Wait for API to initialize
     sleep 3
 
-    # Verify it's running
     if kill -0 "$API_PID" 2>/dev/null; then
         log_success "Go API server is ready"
     else
@@ -215,9 +177,7 @@ monitor_services() {
     echo "══════════════════════════════════════════════════════════════════════"
     echo ""
 
-    # Monitor both processes
     while true; do
-        # Check if either process died
         if ! kill -0 "$NEXT_PID" 2>/dev/null || ! kill -0 "$API_PID" 2>/dev/null; then
             log_error "A service has stopped unexpectedly!"
             break
@@ -234,10 +194,6 @@ cleanup() {
     echo ""
     log_info "Stopping services..."
 
-    # Stop PostgreSQL
-    su - postgres -c "pg_ctl -D /var/lib/postgresql/data stop" 2>/dev/null || true
-
-    # Read PIDs
     if [ -f /tmp/next.pid ]; then
         kill "$(cat /tmp/next.pid)" 2>/dev/null || true
         rm -f /tmp/next.pid
@@ -259,24 +215,18 @@ cleanup() {
 main() {
     display_header
 
-    # Initialize embedded PostgreSQL
-    if init_database; then
-        start_postgres
+    if wait_for_database; then
         run_migrations
     else
-        log_error "Failed to initialize database"
+        log_error "Database not available, starting without migrations..."
     fi
 
-    # Start services
     start_frontend || log_error "Frontend failed to start"
     start_api || log_error "API failed to start"
 
-    # Monitor
     monitor_services
 }
 
-# Trap for cleanup
 trap cleanup SIGINT SIGTERM
 
-# Run
 main

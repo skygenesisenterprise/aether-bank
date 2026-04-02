@@ -77,6 +77,11 @@ setup_pnpm() {
 # =============================================================================
 
 wait_for_database() {
+    if [ "$SKIP_PRISMA_SETUP" = "true" ]; then
+        log_info "Database check skipped (handled by entrypoint script)"
+        return 0
+    fi
+
     log_info "Waiting for database to be ready..."
 
     MAX_RETRIES=30
@@ -104,6 +109,11 @@ wait_for_database() {
 # =============================================================================
 
 setup_prisma() {
+    if [ "$SKIP_PRISMA_SETUP" = "true" ]; then
+        log_info "Skipping Prisma setup (handled by entrypoint script)"
+        return 0
+    fi
+
     log_info "Setting up Prisma..."
 
     PRISMA_DIR="/app/server/prisma"
