@@ -76,7 +76,7 @@ jobs:
 
       - name: Build and push Docker image
         id: build-and-push
-        uses: docker/build-push-action@b66d8774c665b789105b440514f0c97e6f19b06f # v6.18.0
+        uses: docker/build-push-action@c5117b60bc829f00aaacb038e99de2712bee6e6e # v6.18.0
         with:
           context: ./prisma
           file: ./prisma/infra/Dockerfile
