@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
-  Users,
   ArrowLeftRight,
   Wallet,
   CreditCard,
@@ -13,9 +12,6 @@ import {
   ArrowUpRight,
   Plus,
   Bell,
-  Globe,
-  ArrowRight,
-  PiggyBank,
   BarChart3,
   Calendar,
   Clock,
@@ -27,7 +23,6 @@ import {
   AlertTriangle,
   Info,
   CheckCircle,
-  Building,
 } from "lucide-react";
 import {
   Area,
@@ -40,15 +35,12 @@ import {
   Cell,
   ResponsiveContainer,
   Tooltip,
-  Bar,
-  BarChart,
 } from "recharts";
 
 import { accountsApi, cardsApi } from "@/lib/api/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import {
   Select,
@@ -376,7 +368,7 @@ export default function PlatformDashboardPage() {
         {quickActions.map((action) => (
           <Link key={action.label} href={action.href}>
             <div className="group flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-600 hover:shadow-lg hover:shadow-indigo-500/10 transition-all cursor-pointer">
-              <div className={`p-3 rounded-xl bg-gradient-to-br ${action.color} shadow-lg`}>
+              <div className={`p-3 rounded-xl bg-linear-to-br ${action.color} shadow-lg`}>
                 <action.icon className="h-5 w-5 text-white" />
               </div>
               <div>
@@ -405,7 +397,7 @@ export default function PlatformDashboardPage() {
 
       {/* KPI Cards Principaux */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950/30 dark:to-gray-800">
+        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-linear-to-br from-indigo-50 to-white dark:from-indigo-950/30 dark:to-gray-800">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-indigo-700 dark:text-indigo-300 font-medium">
@@ -428,7 +420,7 @@ export default function PlatformDashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-purple-50 to-white dark:from-purple-950/30 dark:to-gray-800">
+        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-linear-to-br from-purple-50 to-white dark:from-purple-950/30 dark:to-gray-800">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-purple-700 dark:text-purple-300 font-medium">
@@ -450,7 +442,7 @@ export default function PlatformDashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-cyan-50 to-white dark:from-cyan-950/30 dark:to-gray-800">
+        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-linear-to-br from-cyan-50 to-white dark:from-cyan-950/30 dark:to-gray-800">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-cyan-700 dark:text-cyan-300 font-medium">
@@ -472,7 +464,7 @@ export default function PlatformDashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/30 dark:to-gray-800">
+        <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-linear-to-br from-emerald-50 to-white dark:from-emerald-950/30 dark:to-gray-800">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-emerald-700 dark:text-emerald-300 font-medium">
@@ -703,7 +695,7 @@ export default function PlatformDashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm bg-gradient-to-br from-indigo-600 to-purple-700 text-white">
+        <Card className="border-0 shadow-sm bg-linear-to-br from-indigo-600 to-purple-700 text-white">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
