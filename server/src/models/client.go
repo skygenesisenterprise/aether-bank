@@ -33,6 +33,7 @@ type ClientList struct {
 
 type CreateClientRequest struct {
 	Email    string                 `json:"email"`
+	Password string                 `json:"password"`
 	Name     string                 `json:"name"`
 	Company  string                 `json:"company,omitempty"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`

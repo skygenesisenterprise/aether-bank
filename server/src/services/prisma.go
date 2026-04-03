@@ -420,6 +420,17 @@ func (p *PrismaService) DeleteUser(id string) error {
 	return nil
 }
 
+func (p *PrismaService) AdminExists() (bool, error) {
+	ctx := context.Background()
+
+	var count int
+	err := p.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE role = 'ADMIN' AND is_active = true").Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("failed to check admin existence: %w", err)
+	}
+	return count > 0, nil
+}
+
 // ==================== BANKING METHODS ====================
 
 func (p *PrismaService) initBankingTables() error {

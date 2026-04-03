@@ -26,6 +26,7 @@ import {
   Cloud,
   Code2,
   HelpCircle,
+  Terminal,
 } from "lucide-react";
 
 const navigation = [
@@ -85,6 +86,7 @@ const secondaryNavigation = [
 
 const bottomNavigation = [
   { name: "Paramètres", href: "/dashboard/settings", icon: Settings },
+  { name: "Logs", href: "/dashboard/logs", icon: Terminal },
   { name: "Aide", href: "/dashboard/help", icon: HelpCircle },
 ];
 

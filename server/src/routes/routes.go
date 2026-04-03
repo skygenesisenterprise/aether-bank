@@ -90,6 +90,7 @@ func SetupRoutesWithServiceKey(router *gin.Engine, jwtService *services.JWTServi
 			auth.POST("/change-password", authMiddleware.RequireAuth(), authHandler.ChangePassword)
 			auth.POST("/reset-password", authHandler.ResetPassword)
 			auth.POST("/validate", authHandler.ValidateToken)
+			auth.GET("/setup-status", authHandler.GetSetupStatus)
 		}
 
 		// ==================== ACCOUNT ====================
@@ -547,7 +548,7 @@ func SetupRoutesWithServiceKey(router *gin.Engine, jwtService *services.JWTServi
 // ==================== AUTH HANDLERS ====================
 
 var (
-	defaultAdminEmail    = "admin@etheriatimes.com"
+	defaultAdminEmail    = "admin@skygenesisenterprise.com"
 	defaultAdminPassword = "Admin123!"
 	defaultAdminName     = "Admin Principal"
 )
@@ -569,11 +570,25 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	var userID, userName string
 	var isValid bool
+	var isDefaultAdmin bool
 
 	if req.Email == defaultAdminEmail && req.Password == defaultAdminPassword {
+		prismaService := services.GetPrismaService()
+		if prismaService != nil {
+			adminExists, err := prismaService.AdminExists()
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, models.AuthResponse{Success: false, Error: "Failed to check setup status"})
+				return
+			}
+			if adminExists {
+				c.JSON(http.StatusUnauthorized, models.AuthResponse{Success: false, Error: "Email ou mot de passe incorrect"})
+				return
+			}
+		}
 		isValid = true
 		userID = "admin-1"
 		userName = defaultAdminName
+		isDefaultAdmin = true
 	} else if req.Email == "demo@etheriatimes.com" && req.Password == "demo123" {
 		isValid = true
 		userID = "demo-1"
@@ -637,6 +652,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			AccessToken: token, RefreshToken: refreshToken, TokenType: "Bearer",
 			ExpiresIn: h.jwtService.GetExpirySeconds(), User: user,
 		},
+		Metadata: map[string]interface{}{
+			"isFirstLogin": isDefaultAdmin,
+		},
 	})
 }
 
@@ -658,14 +676,72 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 
-	token, _ := h.jwtService.GenerateToken(userID, "account-123", "user@example.com", "user")
-	refreshToken, _ := h.jwtService.GenerateRefreshToken(userID)
+	var email, userName string
+	if userID == "admin-1" {
+		email = defaultAdminEmail
+		userName = defaultAdminName
+	} else if userID == "demo-1" {
+		email = "demo@etheriatimes.com"
+		userName = "Demo User"
+	} else {
+		prismaService := services.GetPrismaService()
+		if prismaService != nil {
+			etheriaUser, err := prismaService.GetUser(userID)
+			if err == nil && etheriaUser != nil {
+				email = etheriaUser.Email
+				userName = strings.TrimSpace(etheriaUser.FirstName + " " + etheriaUser.LastName)
+				if userName == "" {
+					userName = etheriaUser.Email
+				}
+			}
+		}
+	}
 
+	if email == "" {
+		email = "user@example.com"
+	}
+	if userName == "" {
+		userName = "User"
+	}
+
+	token, err := h.jwtService.GenerateToken(userID, "account-1", email, userName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.AuthResponse{Success: false, Error: "Failed to generate token"})
+		return
+	}
+
+	refreshToken, err := h.jwtService.GenerateRefreshToken(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.AuthResponse{Success: false, Error: "Failed to generate refresh token"})
+		return
+	}
+
+	c.SetCookie("auth_token", token, 86400*7, "/", "", false, true)
 	c.JSON(http.StatusOK, models.AuthResponse{
 		Success: true,
 		Data: &models.TokenResponse{
 			AccessToken: token, RefreshToken: refreshToken, TokenType: "Bearer",
 			ExpiresIn: h.jwtService.GetExpirySeconds(),
+		},
+	})
+}
+
+func (h *AuthHandler) GetSetupStatus(c *gin.Context) {
+	prismaService := services.GetPrismaService()
+	adminExists := false
+	if prismaService != nil {
+		exists, err := prismaService.AdminExists()
+		if err == nil {
+			adminExists = exists
+		}
+	}
+
+	c.JSON(http.StatusOK, models.AuthResponse{
+		Success: true,
+		Data:    nil,
+		Metadata: map[string]any{
+			"adminExists":    adminExists,
+			"defaultEnabled": !adminExists,
 		},
 	})
 }

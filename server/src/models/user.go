@@ -60,10 +60,11 @@ type TokenResponse struct {
 }
 
 type AuthResponse struct {
-	Success bool           `json:"success"`
-	Message string         `json:"message,omitempty"`
-	Data    *TokenResponse `json:"data,omitempty"`
-	Error   string         `json:"error,omitempty"`
+	Success  bool           `json:"success"`
+	Message  string         `json:"message,omitempty"`
+	Data     *TokenResponse `json:"data,omitempty"`
+	Error    string         `json:"error,omitempty"`
+	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
 type LoginRequest struct {

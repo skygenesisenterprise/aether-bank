@@ -33,6 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     try {
       const token = localStorage.getItem("accessToken");
+      const refreshToken = localStorage.getItem("refreshToken");
       const storedUser = authApi.getStoredUser();
 
       console.log(
@@ -43,24 +44,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
 
       if (token && token.length > 0 && token !== "undefined" && token !== "null") {
-        if (storedUser) {
-          console.log("[AuthContext] Setting user from stored data");
-          setUser(storedUser);
-        } else {
-          console.log("[AuthContext] Token exists but no stored user, fetching account");
-          try {
-            const accountResponse = await authApi.getAccount();
-            if (accountResponse.success && accountResponse.data?.user) {
-              authApi.storeUser(accountResponse.data.user);
-              setUser(accountResponse.data.user);
-            } else {
-              console.log("[AuthContext] Could not fetch account, clearing invalid session");
+        try {
+          const accountResponse = await authApi.getAccount();
+          if (accountResponse.success && accountResponse.data?.user) {
+            authApi.storeUser(accountResponse.data.user);
+            setUser(accountResponse.data.user);
+          } else {
+            throw new Error("Invalid account response");
+          }
+        } catch (e) {
+          console.log("[AuthContext] Token expired, attempting refresh...");
+          if (refreshToken && refreshToken.length > 0) {
+            try {
+              const refreshResponse = await authApi.refreshToken(refreshToken);
+              if (refreshResponse.success && refreshResponse.data?.accessToken) {
+                authApi.storeTokens(
+                  refreshResponse.data.accessToken,
+                  refreshResponse.data.refreshToken || ""
+                );
+                if (storedUser) {
+                  setUser(storedUser);
+                } else {
+                  const accountResponse = await authApi.getAccount();
+                  if (accountResponse.success && accountResponse.data?.user) {
+                    authApi.storeUser(accountResponse.data.user);
+                    setUser(accountResponse.data.user);
+                  } else {
+                    throw new Error("Failed to fetch account after refresh");
+                  }
+                }
+              } else {
+                throw new Error("Refresh failed");
+              }
+            } catch (refreshError) {
+              console.error("[AuthContext] Refresh failed:", refreshError);
               authApi.clearTokens();
               authApi.clearUser();
               setUser(null);
             }
-          } catch (e) {
-            console.error("[AuthContext] Error fetching account:", e);
+          } else {
+            console.error("[AuthContext] No refresh token, clearing session");
             authApi.clearTokens();
             authApi.clearUser();
             setUser(null);
@@ -107,7 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("[AuthContext] Login successful, user set, redirecting...");
 
       const isAdmin = email.toLowerCase().endsWith("@etheriatimes.com");
-      const redirectTo = isAdmin ? "/dashboard" : "/user";
+      const redirectTo = isAdmin ? "/dashboard" : "/user/home";
       console.log("[AuthContext] Redirecting to:", redirectTo);
       router.push(redirectTo);
     } catch (error) {

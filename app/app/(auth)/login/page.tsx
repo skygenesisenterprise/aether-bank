@@ -87,7 +87,7 @@ export default function LoginPage() {
             <div className="w-12 h-0.5 bg-primary" />
             <blockquote className="text-white">
               <p className="font-serif text-2xl font-medium leading-relaxed text-pretty">
-                &ldquo;Le service banciare au service du citoyen, aujourd&apos;hui et demain.&rdquo;
+                &ldquo;Le service bancaire au service du citoyen, aujourd&apos;hui et demain.&rdquo;
               </p>
               <footer className="mt-4 text-sm text-white/60 font-sans">
                 — L'équipe de Aether Bank par Sky Genesis Enterprise

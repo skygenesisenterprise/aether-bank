@@ -48,7 +48,14 @@ import {
   YAxis,
 } from "recharts";
 
-import { accountsApi, BankAccount, getBalance, getAvailableBalance } from "@/lib/api/client";
+import {
+  accountsApi,
+  clientsApi,
+  BankAccount,
+  Client,
+  getBalance,
+  getAvailableBalance,
+} from "@/lib/api/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -79,15 +86,6 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-const clients = [
-  { id: 1, name: "SARL TechSolutions", type: "Entreprise" },
-  { id: 2, name: "Marie Dupont", type: "Particulier" },
-  { id: 3, name: "SAS InnovTech", type: "Entreprise" },
-  { id: 4, name: "Jean Martin", type: "Particulier" },
-  { id: 5, name: "EURL Boulanger", type: "Entreprise" },
-  { id: 6, name: "Sophie Bernard", type: "Particulier" },
-];
 
 const bankInternalAccounts = [
   { id: 101, name: "Réserve Obligatoire BCE", type: "Compte Réserve", category: "Banque" },
@@ -176,7 +174,7 @@ const complianceData = [
 ];
 
 function formatCurrency(amount: number, currency: string = "EUR") {
-  return amount.toLocaleString("fr-FR", { style: "currency", currency });
+  return (amount / 100).toLocaleString("fr-FR", { style: "currency", currency });
 }
 
 function formatNumber(num: number) {
@@ -257,6 +255,7 @@ export default function AccountsPage() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [isOpenAccountOpen, setIsOpenAccountOpen] = useState(false);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -297,7 +296,7 @@ export default function AccountsPage() {
     totalBalance: accounts.reduce((sum, a) => sum + getBalance(a), 0),
     totalAvailable: accounts.reduce((sum, a) => sum + getAvailableBalance(a), 0),
     bankBalance: accounts
-      .filter((a) => a.owner_category === "bank")
+      .filter((a) => a.owner_category === "bank" || a.holder?.type === "bank")
       .reduce((sum, a) => sum + getBalance(a), 0),
     clientBalance: accounts
       .filter(
@@ -313,22 +312,40 @@ export default function AccountsPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await accountsApi.list({
-        status: statusFilter !== "all" ? statusFilter : undefined,
-        type: typeFilter !== "all" ? typeFilter : undefined,
-        category: categoryFilter !== "all" ? categoryFilter : undefined,
-        search: searchQuery || undefined,
-      });
-      console.log("[DEBUG] List accounts response:", response);
-      if (response && response.success && response.data) {
-        const accountsData = Array.isArray(response.data)
-          ? response.data
-          : (response.data as any).data || [];
-        console.log("[DEBUG] Accounts data:", accountsData);
-        console.log("[DEBUG] First account balance:", accountsData[0]?.balance);
+      const [accountsRes, clientsRes] = await Promise.allSettled([
+        accountsApi.list({
+          status: statusFilter !== "all" ? statusFilter : undefined,
+          type: typeFilter !== "all" ? typeFilter : undefined,
+          category: categoryFilter !== "all" ? categoryFilter : undefined,
+          search: searchQuery || undefined,
+        }),
+        clientsApi.list(),
+      ]);
+
+      if (
+        accountsRes.status === "fulfilled" &&
+        accountsRes.value &&
+        accountsRes.value.success &&
+        accountsRes.value.data
+      ) {
+        const accountsData = Array.isArray(accountsRes.value.data)
+          ? accountsRes.value.data
+          : (accountsRes.value.data as any).data || [];
         setAccounts(accountsData);
-      } else {
-        setError(response?.error || "Failed to fetch accounts");
+      } else if (accountsRes.status === "rejected") {
+        setError(accountsRes.reason?.message || "Failed to fetch accounts");
+      }
+
+      if (
+        clientsRes.status === "fulfilled" &&
+        clientsRes.value &&
+        clientsRes.value.success &&
+        clientsRes.value.data
+      ) {
+        const clientsData = Array.isArray(clientsRes.value.data)
+          ? clientsRes.value.data
+          : (clientsRes.value.data as any).data || [];
+        setClients(clientsData);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -1138,8 +1155,8 @@ export default function AccountsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {clients.map((client) => (
-                        <SelectItem key={client.id} value={client.id.toString()}>
-                          {client.name} ({client.type})
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.name} ({client.company || "Particulier"})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1410,17 +1427,15 @@ export default function AccountsPage() {
                       alert("Veuillez sélectionner un client");
                       return;
                     }
-                    const selectedClient = clients.find(
-                      (c) => c.id.toString() === newAccount.clientId
-                    );
+                    const selectedClient = clients.find((c) => c.id === newAccount.clientId);
                     const requestData = {
                       account_type: newAccount.accountType.toLowerCase().replace(" ", "_"),
                       holder_name: selectedClient?.name || "",
-                      holder_type:
-                        selectedClient?.type === "Entreprise" ? "business" : "individual",
+                      holder_type: selectedClient?.company ? "business" : "individual",
                       currency: newAccount.currency,
                       country_code: "FR",
                       initial_balance: newAccount.initialBalance,
+                      is_internal: false,
                     };
                     console.log("[DEBUG] Creating account with:", requestData);
                     response = await accountsApi.create(requestData);

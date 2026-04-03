@@ -14,7 +14,7 @@ const getApiBaseUrl = () => {
   return "http://localhost:8080";
 };
 
-const API_BASE_URL = getApiBaseUrl();
+export const API_BASE_URL = getApiBaseUrl();
 const SERVICE_KEY =
   process.env.NEXT_PUBLIC_SERVICE_KEY || "sk_etheria_public_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6";
 
@@ -24,12 +24,63 @@ interface RequestOptions extends RequestInit {
 
 class ApiClient {
   private baseURL: string;
+  private isRefreshing = false;
+  private refreshPromise: Promise<boolean> | null = null;
 
   constructor(baseURL: string = API_BASE_URL) {
     this.baseURL = baseURL;
   }
 
-  private async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
+  private async refreshToken(): Promise<boolean> {
+    if (typeof window === "undefined") return false;
+
+    const refreshToken = localStorage.getItem("refreshToken");
+    if (!refreshToken) return false;
+
+    try {
+      const response = await fetch(`${this.baseURL}/api/v1/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (!response.ok) return false;
+
+      const data = await response.json();
+      if (data.success && data.data?.accessToken) {
+        localStorage.setItem("accessToken", data.data.accessToken);
+        if (data.data.refreshToken) {
+          localStorage.setItem("refreshToken", data.data.refreshToken);
+        }
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  private async ensureValidToken(): Promise<boolean> {
+    if (this.isRefreshing && this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.isRefreshing = true;
+    this.refreshPromise = this.refreshToken();
+
+    const result = await this.refreshPromise;
+
+    this.isRefreshing = false;
+    this.refreshPromise = null;
+
+    return result;
+  }
+
+  private async request<T>(
+    endpoint: string,
+    options: RequestOptions = {},
+    retry = false
+  ): Promise<T> {
     const { params, ...fetchOptions } = options;
 
     let url = `${this.baseURL}${endpoint}`;
@@ -51,6 +102,21 @@ class ApiClient {
     };
 
     const response = await fetch(url, config);
+
+    if (response.status === 401 && !retry) {
+      const refreshed = await this.ensureValidToken();
+      if (refreshed) {
+        return this.request<T>(endpoint, options, true);
+      }
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("user");
+        window.location.href = "/login";
+      }
+      throw new Error("Authentication required");
+    }
+
     const data = await response.json();
 
     if (!response.ok) {
@@ -631,6 +697,11 @@ export interface BankCard {
   brand: string;
   status: string;
   holder_name: string;
+  contactless?: boolean;
+  online_payments?: boolean;
+  spending_limit?: number;
+  atm_limit?: number;
+  international?: boolean;
 }
 
 export interface BankAccount {
@@ -680,8 +751,8 @@ export interface BankAccountResponse {
 
 export interface BankAccountListResponse {
   success: boolean;
-  data: BankAccount[];
-  total: number;
+  data?: BankAccount[] | { data: BankAccount[]; total: number };
+  total?: number;
   error?: string;
 }
 
@@ -799,7 +870,7 @@ export interface CardListData {
 
 export interface CardListResponse {
   success: boolean;
-  data?: CardListData;
+  data?: BankCard[] | CardListData | { data: BankCard[]; total: number };
   error?: string;
 }
 
@@ -814,4 +885,66 @@ export const cardsApi = {
     apiClient.post<CardResponse>(`/api/v1/cards/${id}/freeze`, { reason }),
 
   unfreeze: (id: string) => apiClient.post<CardResponse>(`/api/v1/cards/${id}/unfreeze`),
+};
+
+export interface Client {
+  id: string;
+  name: string;
+  email: string;
+  company?: string;
+  status: string;
+  kyc_verified: boolean;
+  account_ids?: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClientListData {
+  data: Client[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface ClientResponse {
+  success: boolean;
+  data?: Client;
+  error?: string;
+}
+
+export interface ClientListResponse {
+  success: boolean;
+  data?: Client[] | ClientListData;
+  error?: string;
+}
+
+export interface CreateClientRequest {
+  email: string;
+  password: string;
+  name: string;
+  company?: string;
+}
+
+export const clientsApi = {
+  list: () => apiClient.get<ClientListResponse>("/api/v1/clients"),
+
+  get: (id: string) => apiClient.get<ClientResponse>(`/api/v1/clients/${id}`),
+
+  create: (data: CreateClientRequest) => apiClient.post<ClientResponse>("/api/v1/clients", data),
+};
+
+export interface DockerLogsResponse {
+  success: boolean;
+  data?: {
+    logs: string[];
+    container: string;
+  };
+  error?: string;
+}
+
+export const dockerApi = {
+  getLogs: (container: string, lines: number = 100) =>
+    apiClient.get<DockerLogsResponse>("/api/v1/docker/logs", {
+      params: { container, lines: String(lines) },
+    }),
 };

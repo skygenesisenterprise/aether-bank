@@ -78,6 +78,16 @@ func generateBankingID(prefix string) string {
 	return result
 }
 
+func generateRandomPassword() string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+	result := make([]byte, 12)
+	for i := range result {
+		n, _ := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		result[i] = charset[n.Int64()]
+	}
+	return string(result)
+}
+
 func generateIBAN() string {
 	const chars = "0123456789"
 	fr := "FR76"
@@ -674,17 +684,23 @@ func (s *BankingService) ExportFEC(req *models.ExportFECRequest) *models.ExportF
 }
 
 func (s *BankingService) CreateClient(req *models.CreateClientRequest) *models.Client {
+	if req.Password == "" {
+		req.Password = generateRandomPassword()
+	}
+
 	client := &models.Client{
 		ID:          generateBankingID("cli"),
 		AccountIDs:  []string{},
 		Email:       req.Email,
 		Name:        req.Name,
 		Company:     req.Company,
-		Status:      models.ClientStatusPending,
+		Status:      models.ClientStatusActive,
 		KYCVerified: false,
-		Metadata:    req.Metadata,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		Metadata: map[string]interface{}{
+			"password": req.Password,
+		},
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 	clients[client.ID] = client
 	return client
