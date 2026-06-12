@@ -4,6 +4,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
+import { useMobileAuth } from "@/components/mobile/mobile-auth-provider";
 import { ScreenTransition } from "@/components/mobile/screen-transition";
 import { usePhoneSafeAreaInsets } from "@/components/mobile/use-phone-safe-area";
 
@@ -14,28 +15,21 @@ import { usePhoneSafeAreaInsets } from "@/components/mobile/use-phone-safe-area"
 // TODO: Configure redirect URI for mobile app
 // TODO: Connect Keycloak / Aether Identity client
 
-const hasExistingSession = false;
-
 export default function LoginScreen() {
   const insets = usePhoneSafeAreaInsets();
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-
-  React.useEffect(() => {
-    if (hasExistingSession) {
-      router.replace("/unlock");
-    }
-  }, []);
+  const { isAuthenticated, isHydrating, signIn } = useMobileAuth();
+  const [email, setEmail] = React.useState("admin@aetherbank.me");
+  const [password, setPassword] = React.useState("admin123");
 
   function handleLogin() {
-    router.replace("/");
+    signIn({ email });
   }
 
   function handleSSO() {
     // TODO: Open sso.skygenesisenterprise.com with expo-auth-session
   }
 
-  if (hasExistingSession) {
+  if (isHydrating || isAuthenticated) {
     return null;
   }
 

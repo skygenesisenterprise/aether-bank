@@ -1,14 +1,16 @@
 import * as React from "react";
 
 import { MaterialIcons } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
+import { Redirect, Tabs, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Platform, StyleSheet, useColorScheme, View, ViewStyle } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import "@/styles/globals.css";
 
+import { MobileAuthProvider, useMobileAuth } from "@/components/mobile/mobile-auth-provider";
 import { PushNotificationManager } from "@/components/mobile/push-notification-manager";
+import { PortalProvider } from "@/components/mobile/portal-provider";
 import { Colors } from "@/constants/theme";
 
 interface TabIconProps {
@@ -54,8 +56,24 @@ function TabIcon({ color, focused, name }: TabIconProps) {
 
 function MobileLayoutTabs() {
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
   const scheme = useColorScheme();
   const theme = Colors[scheme === "dark" ? "dark" : "light"];
+  const { isAuthenticated, isHydrating } = useMobileAuth();
+
+  const isPublicRoute = pathname === "/" || pathname === "/login" || pathname === "/register" || pathname === "/unlock";
+
+  if (isHydrating) {
+    return null;
+  }
+
+  if (!isAuthenticated && !isPublicRoute) {
+    return <Redirect href="/login" />;
+  }
+
+  if (isAuthenticated && (pathname === "/" || pathname === "/login" || pathname === "/register")) {
+    return <Redirect href="/home" />;
+  }
 
   return (
     <Tabs
@@ -93,7 +111,8 @@ function MobileLayoutTabs() {
         },
       }}
     >
-      {/* Home screen: apps/mobile/home.tsx reuses apps/mobile/index.tsx */}
+      {/* Home screen */}
+      <Tabs.Screen name="index" options={{ href: null }} />
       <Tabs.Screen
         name="home"
         options={{
@@ -105,7 +124,6 @@ function MobileLayoutTabs() {
           ),
         }}
       />
-      <Tabs.Screen name="index" options={{ href: null }} />
       <Tabs.Screen
         name="invest"
         options={{
@@ -137,27 +155,28 @@ function MobileLayoutTabs() {
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="hub"
         options={{
           title: "Hub",
           tabBarLabel: "Hub",
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="account-circle" color={color} focused={focused} />
+            <TabIcon name="widgets" color={color} focused={focused} />
           ),
         }}
       />
+      <Tabs.Screen
+        name="profile"
+        options={{ href: null, tabBarStyle: { display: "none" } }}
+      />
       <Tabs.Screen name="cards" options={{ href: null, tabBarStyle: { display: "none" } }} />
-      <Tabs.Screen name="apps" options={{ href: null }} />
       <Tabs.Screen name="account" options={{ href: null }} />
+      <Tabs.Screen name="account-detail" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="notifications" options={{ href: null }} />
       <Tabs.Screen name="_dashboard" options={{ href: null }} />
-      <Tabs.Screen name="news-detail" options={{ href: null }} />
       <Tabs.Screen name="product-detail" options={{ href: null }} />
-      <Tabs.Screen name="guilderia-developer" options={{ href: null }} />
-      <Tabs.Screen name="app-detail" options={{ href: null }} />
       <Tabs.Screen name="analytics" options={{ href: null, tabBarStyle: { display: "none" } }} />
-      <Tabs.Screen name="transaction-detail" options={{ href: null }} />
-      <Tabs.Screen name="transactions" options={{ href: null }} />
+      <Tabs.Screen name="transaction-detail" options={{ href: null, tabBarStyle: { display: "none" } }} />
+      <Tabs.Screen name="transactions" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="settings" options={{ href: null }} />
       <Tabs.Screen
         name="login"
@@ -200,7 +219,11 @@ export default function MobileLayout() {
       <StatusBar style="dark" />
       <PushNotificationManager>
         <WebPhoneFrame>
-          <MobileLayoutTabs />
+          <MobileAuthProvider>
+            <PortalProvider>
+              <MobileLayoutTabs />
+            </PortalProvider>
+          </MobileAuthProvider>
         </WebPhoneFrame>
       </PushNotificationManager>
     </SafeAreaProvider>

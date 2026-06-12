@@ -6,54 +6,9 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { ScreenTransition } from "@/components/mobile/screen-transition";
 import { usePhoneSafeAreaInsets } from "@/components/mobile/use-phone-safe-area";
+import { type Transaction, categoryConfig, transactions } from "@/data/transactions";
 
-type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
 
-interface Transaction {
-  title: string;
-  description: string;
-  amount: string;
-  tone: "credit" | "debit";
-  icon: IconName;
-}
-
-const transactions: Transaction[] = [
-  { title: "Sky Genesis Enterprise", description: "Aujourd'hui, 14:30 · Versement entrant", amount: "+8,500.00 €", tone: "credit", icon: "business-center" },
-  { title: "Netflix", description: "Aujourd'hui, 09:24 · Carte virtuelle", amount: "-15.99 €", tone: "debit", icon: "movie" },
-  { title: "Monoprix", description: "Hier, 12:42 · Paiement carte", amount: "-92.30 €", tone: "debit", icon: "shopping-bag" },
-  { title: "Aether Office", description: "Hier, 15:20 · Remboursement interne", amount: "+830.00 €", tone: "credit", icon: "workspaces" },
-  { title: "Amazon", description: "11 juin, 18:05 · Achat en ligne", amount: "-129.99 €", tone: "debit", icon: "shopping-cart" },
-  { title: "Spotify", description: "11 juin, 06:00 · Abonnement mensuel", amount: "-10.99 €", tone: "debit", icon: "music-note" },
-  { title: "Virement SGE", description: "10 juin, 11:15 · Salaire juin", amount: "+4,200.00 €", tone: "credit", icon: "account-balance" },
-  { title: "Carrefour", description: "10 juin, 09:30 · Courses", amount: "-67.45 €", tone: "debit", icon: "local-grocery-store" },
-  { title: "Free Mobile", description: "9 juin, 08:00 · Forfait mobile", amount: "-19.99 €", tone: "debit", icon: "smartphone" },
-  { title: "EDF", description: "8 juin, 10:00 · Facture électricité", amount: "-89.00 €", tone: "debit", icon: "bolt" },
-  { title: "Client Dupont", description: "8 juin, 16:45 · Facture prestation", amount: "+1,200.00 €", tone: "credit", icon: "receipt" },
-  { title: "Uber Eats", description: "7 juin, 20:15 · Livraison", amount: "-24.50 €", tone: "debit", icon: "restaurant" },
-  { title: "SNCF", description: "7 juin, 07:30 · Billet TGV", amount: "-79.00 €", tone: "debit", icon: "train" },
-  { title: "Orange", description: "6 juin, 09:00 · Facture internet", amount: "-42.99 €", tone: "debit", icon: "wifi" },
-  { title: "Remboursement CAF", description: "6 juin, 14:00 · Aide logement", amount: "+250.00 €", tone: "credit", icon: "home" },
-  { title: "Leroy Merlin", description: "5 juin, 16:30 · Bricolage", amount: "-156.00 €", tone: "debit", icon: "build" },
-  { title: "Doctolib", description: "5 juin, 11:00 · Consultation", amount: "-25.00 €", tone: "debit", icon: "local-hospital" },
-  { title: "Assurance AXA", description: "4 juin, 08:00 · Prélèvement auto", amount: "-54.00 €", tone: "debit", icon: "verified-user" },
-  { title: "Freelance Martin", description: "4 juin, 19:00 · Projet web", amount: "+2,400.00 €", tone: "credit", icon: "code" },
-  { title: "Total Energie", description: "3 juin, 10:30 · Essence", amount: "-65.00 €", tone: "debit", icon: "local-gas-station" },
-  { title: "Decathlon", description: "3 juin, 15:00 · Sport", amount: "-89.99 €", tone: "debit", icon: "directions-bike" },
-  { title: "Café Michel", description: "2 juin, 08:45 · Petit-déjeuner", amount: "-4.50 €", tone: "debit", icon: "local-cafe" },
-  { title: "Dividendes Aether", description: "2 juin, 12:00 · Revenus trimestriels", amount: "+320.00 €", tone: "credit", icon: "trending-up" },
-  { title: "Zara", description: "1 juin, 14:20 · Vêtements", amount: "-120.00 €", tone: "debit", icon: "checkroom" },
-  { title: "IBKR Dépôt", description: "1 juin, 09:00 · Compte titres", amount: "-500.00 €", tone: "debit", icon: "show-chart" },
-  { title: "Loyer", description: "30 mai, 08:00 · Appartement", amount: "-950.00 €", tone: "debit", icon: "apartment" },
-  { title: "Vente Leboncoin", description: "29 mai, 18:30 · Meuble", amount: "+150.00 €", tone: "credit", icon: "sell" },
-  { title: "Sephora", description: "29 mai, 11:00 · Beauté", amount: "-45.00 €", tone: "debit", icon: "spa" },
-  { title: "Uber", description: "28 mai, 23:00 · Course", amount: "-18.00 €", tone: "debit", icon: "local-taxi" },
-  { title: "Cashback Aether", description: "28 mai, 10:00 · Fidélité", amount: "+12.50 €", tone: "credit", icon: "card-giftcard" },
-  { title: "Fnac", description: "27 mai, 14:00 · Livre", amount: "-34.90 €", tone: "debit", icon: "menu-book" },
-  { title: "Sicap", description: "27 mai, 09:00 · Assurance habitation", amount: "-22.00 €", tone: "debit", icon: "shield" },
-  { title: "Remboursement Sécu", description: "26 mai, 15:00 · Soins médicaux", amount: "+65.00 €", tone: "credit", icon: "healing" },
-  { title: "McDonald's", description: "26 mai, 12:30 · Déjeuner", amount: "-11.50 €", tone: "debit", icon: "fastfood" },
-  { title: "Boursorama", description: "25 mai, 08:00 · Prélèvement compte", amount: "-7.99 €", tone: "debit", icon: "account-balance-wallet" },
-];
 
 export default function TransactionsScreen() {
   const insets = usePhoneSafeAreaInsets();
@@ -125,18 +80,22 @@ function SummaryCard() {
 }
 
 function TransactionRow({ transaction, isLast }: { transaction: Transaction; isLast: boolean }) {
+  const cat = categoryConfig[transaction.category];
   return (
     <Pressable style={[styles.transactionRow, isLast && styles.transactionRowLast]} onPress={() => router.push(`/transaction-detail?title=${encodeURIComponent(transaction.title)}`)}>
-      <View style={styles.transactionIcon}>
-        <MaterialIcons name={transaction.icon} size={20} color="#111827" />
+      <View style={[styles.transactionIcon, { backgroundColor: cat.bgColor }]}>
+        <MaterialIcons name={transaction.icon} size={20} color={cat.color} />
       </View>
       <View style={styles.transactionCopy}>
         <Text style={styles.transactionTitle}>{transaction.title}</Text>
         <Text style={styles.transactionDescription}>{transaction.description}</Text>
       </View>
-      <Text style={[styles.transactionAmount, transaction.tone === "credit" ? styles.creditAmount : styles.debitAmount]}>
-        {transaction.amount}
-      </Text>
+      <View style={styles.transactionRight}>
+        <Text style={[styles.transactionAmount, transaction.tone === "credit" ? styles.creditAmount : styles.debitAmount]}>
+          {transaction.amount}
+        </Text>
+        <Text style={styles.transactionCategory}>{cat.label}</Text>
+      </View>
     </Pressable>
   );
 }
@@ -279,5 +238,15 @@ const styles = StyleSheet.create({
   },
   debitAmount: {
     color: "#111827",
+  },
+  transactionRight: {
+    alignItems: "flex-end",
+  },
+  transactionCategory: {
+    color: "#9CA3AF",
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "700",
+    marginTop: 2,
   },
 });

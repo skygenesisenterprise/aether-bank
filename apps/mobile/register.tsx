@@ -4,6 +4,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
+import { useMobileAuth } from "@/components/mobile/mobile-auth-provider";
 import { ScreenTransition } from "@/components/mobile/screen-transition";
 import { usePhoneSafeAreaInsets } from "@/components/mobile/use-phone-safe-area";
 
@@ -16,6 +17,7 @@ const regions = ["Europe", "North America", "Asia-Pacific"];
 
 export default function RegisterScreen() {
   const insets = usePhoneSafeAreaInsets();
+  const { signIn } = useMobileAuth();
   const [prenom, setPrenom] = React.useState("");
   const [nom, setNom] = React.useState("");
   const [email, setEmail] = React.useState("");
@@ -44,7 +46,7 @@ export default function RegisterScreen() {
     }
 
     setSuccess(true);
-    setTimeout(() => router.replace("/"), 1200);
+    signIn({ email, firstName: prenom, lastName: nom });
   }
 
   return (

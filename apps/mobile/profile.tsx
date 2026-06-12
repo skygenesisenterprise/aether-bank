@@ -4,6 +4,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { useMobileAuth } from "@/components/mobile/mobile-auth-provider";
 import { ScreenTransition } from "@/components/mobile/screen-transition";
 import { usePhoneSafeAreaInsets } from "@/components/mobile/use-phone-safe-area";
 
@@ -61,6 +62,7 @@ const developerItems: { icon: IconName; label: string }[] = [
 
 export default function ProfileScreen() {
   const insets = usePhoneSafeAreaInsets();
+  const { signOut } = useMobileAuth();
 
   return (
     <ScreenTransition direction="up">
@@ -77,7 +79,7 @@ export default function ProfileScreen() {
           <SecurityCard />
           <MenuCard />
           {isDeveloperAccess && <DeveloperSection />}
-          <LogoutButton />
+          <LogoutButton onPress={signOut} />
           <Footer />
         </ScrollView>
       </View>
@@ -202,14 +204,13 @@ function DeveloperSection() {
   );
 }
 
-function LogoutButton() {
+function LogoutButton({ onPress }: { onPress: () => void }) {
   return (
-    <Pressable style={styles.logoutButton}>
+    <Pressable style={styles.logoutButton} onPress={onPress}>
       <MaterialIcons name="logout" size={18} color="#BD2E2E" />
       <Text style={styles.logoutText}>Se déconnecter</Text>
     </Pressable>
   );
-  // TODO: Connect logout with Aether Identity
 }
 
 function Footer() {
@@ -217,9 +218,6 @@ function Footer() {
     <View style={styles.footer}>
       <Text style={styles.footerTitle}>Aether Bank</Text>
       <Text style={styles.footerVersion}>Version 1.0.0</Text>
-      <Text style={styles.footerLogin}>
-        Dernière connexion : {profile.lastLogin}
-      </Text>
     </View>
   );
 }

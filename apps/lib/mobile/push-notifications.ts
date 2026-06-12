@@ -10,6 +10,27 @@ export interface PushNotificationRegistration {
   token?: string;
 }
 
+export type BankNotificationKind = "money_received" | "card_debited" | "transfer_sent";
+
+export interface BankNotificationData {
+  accountId?: string;
+  amount?: number;
+  counterparty?: string;
+  currency?: string;
+  kind: BankNotificationKind;
+  route?: string;
+  transactionId?: string;
+}
+
+interface FinanceNotificationInput {
+  accountId?: string;
+  amount: number;
+  counterparty: string;
+  currency?: string;
+  route?: string;
+  transactionId?: string;
+}
+
 export const AETHER_BANK_NOTIFICATION_CHANNEL_ID = "aether-bank";
 
 Notifications.setNotificationHandler({
@@ -69,6 +90,13 @@ export async function registerForPushNotificationsAsync(): Promise<PushNotificat
   }
 
   const projectId = getExpoProjectId();
+  if (!projectId) {
+    return {
+      permissionStatus: finalStatus,
+      error: "No Expo projectId configured for push notifications.",
+    };
+  }
+
   const tokenResponse = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
 
   return {
@@ -109,16 +137,86 @@ export async function scheduleLocalTestNotificationAsync() {
         source: "local-test",
       },
     },
-    trigger: {
-      seconds: 2,
+    trigger: null,
+  });
+}
+
+export async function scheduleMoneyReceivedNotificationAsync(input: FinanceNotificationInput) {
+  const currency = input.currency ?? "EUR";
+
+  return Notifications.scheduleNotificationAsync({
+    content: {
+      title: "Argent reçu",
+      body: `${formatCurrency(input.amount, currency)} recus de ${input.counterparty}.`,
+      data: {
+        accountId: input.accountId,
+        amount: input.amount,
+        counterparty: input.counterparty,
+        currency,
+        kind: "money_received",
+        route: input.route ?? "/transactions",
+        transactionId: input.transactionId,
+      } satisfies BankNotificationData,
     },
+    trigger: null,
+  });
+}
+
+export async function scheduleCardDebitedNotificationAsync(input: FinanceNotificationInput) {
+  const currency = input.currency ?? "EUR";
+
+  return Notifications.scheduleNotificationAsync({
+    content: {
+      title: "Paiement carte",
+      body: `${formatCurrency(input.amount, currency)} debites chez ${input.counterparty}.`,
+      data: {
+        accountId: input.accountId,
+        amount: input.amount,
+        counterparty: input.counterparty,
+        currency,
+        kind: "card_debited",
+        route: input.route ?? "/transactions",
+        transactionId: input.transactionId,
+      } satisfies BankNotificationData,
+    },
+    trigger: null,
+  });
+}
+
+export async function scheduleTransferSentNotificationAsync(input: FinanceNotificationInput) {
+  const currency = input.currency ?? "EUR";
+
+  return Notifications.scheduleNotificationAsync({
+    content: {
+      title: "Virement envoye",
+      body: `${formatCurrency(input.amount, currency)} envoyes a ${input.counterparty}.`,
+      data: {
+        accountId: input.accountId,
+        amount: input.amount,
+        counterparty: input.counterparty,
+        currency,
+        kind: "transfer_sent",
+        route: input.route ?? "/transferts",
+        transactionId: input.transactionId,
+      } satisfies BankNotificationData,
+    },
+    trigger: null,
   });
 }
 
 function getExpoProjectId() {
   return (
+    process.env.EXPO_PUBLIC_EAS_PROJECT_ID ??
     Constants.easConfig?.projectId ??
     Constants.expoConfig?.extra?.eas?.projectId ??
     Constants.expoConfig?.extra?.projectId
   );
+}
+
+function formatCurrency(amount: number, currency: string) {
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 2,
+  }).format(amount);
 }
