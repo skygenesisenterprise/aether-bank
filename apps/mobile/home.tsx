@@ -2,7 +2,7 @@ import * as React from "react";
 
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Bar, BarChart, ResponsiveContainer, XAxis } from "recharts";
 
 import { ScreenTransition } from "@/components/mobile/screen-transition";
@@ -35,6 +35,20 @@ const quickActions: QuickAction[] = [
   { title: "Entre mes comptes", icon: "shuffle" },
   { title: "Informations", icon: "account-balance" },
   { title: "Plus", icon: "more-horiz" },
+];
+
+interface Account {
+  type: string;
+  balance: string;
+  meta: string;
+}
+
+// TODO: Connect SGE API account list
+const accounts: Account[] = [
+  { type: "Personnel · EUR", balance: "€12,450.80", meta: "Solde disponible" },
+  { type: "Joint · EUR", balance: "€8,230.00", meta: "Compte joint" },
+  { type: "Épargne · EUR", balance: "€34,200.00", meta: "Taux 2.5%" },
+  { type: "Professionnel · EUR", balance: "€89,150.00", meta: "SGE Belgium" },
 ];
 
 // TODO: Connect transaction history endpoint
@@ -87,6 +101,42 @@ const monthlySpendingChartData = [
   { day: "D", amount: 680 },
 ];
 
+interface Promotion {
+  title: string;
+  description: string;
+  action: string;
+  icon: IconName;
+  // TODO: Connect SGE API / notification service
+}
+
+// TODO: Connect SGE API promotions / notification service
+const promotions: Promotion[] = [
+  {
+    title: "Aether Metal",
+    description: "Profitez de vos avantages premium : cashback, cartes virtuelles et support prioritaire.",
+    action: "Découvrir",
+    icon: "diamond",
+  },
+  {
+    title: "Aether Identity",
+    description: "Activez Face ID pour sécuriser vos paiements.",
+    action: "Configurer",
+    icon: "fingerprint",
+  },
+  {
+    title: "Wero",
+    description: "Envoyez de l'argent instantanément en Europe.",
+    action: "Essayer",
+    icon: "send",
+  },
+  {
+    title: "Carte virtuelle",
+    description: "Créez une carte temporaire pour vos achats en ligne.",
+    action: "Créer",
+    icon: "credit-card",
+  },
+];
+
 // TODO: Connect SGE API card list
 const bankCards: BankCard[] = [
   {
@@ -120,24 +170,14 @@ export default function HomeScreen() {
             ))}
           </View>
 
-          {/* TODO: Connect Aether Identity */}
-          <View style={styles.identityCard}>
-            <View style={styles.identityIcon}>
-              <MaterialIcons name="fingerprint" size={25} color="#111827" />
-            </View>
-            <View style={styles.identityCopy}>
-              <Text style={styles.identityTitle}>Aether Identity</Text>
-              <Text style={styles.identityText}>Activez Face ID pour securiser votre compte.</Text>
-            </View>
-            <Pressable style={styles.configureButton}>
-              <Text style={styles.configureText}>Configurer</Text>
-            </Pressable>
-          </View>
+          <PromotionSection />
 
           <View style={styles.postCard}>
             <View style={styles.postHeader}>
               <Text style={styles.postTitle}>Activite recente</Text>
-              <Text style={styles.postAction}>Voir tout</Text>
+              <Pressable onPress={() => router.push("/transactions")}>
+                <Text style={styles.postAction}>Voir tout</Text>
+              </Pressable>
             </View>
             {transactions.map((transaction) => (
               <TransactionRow key={`${transaction.title}-${transaction.amount}`} transaction={transaction} />
@@ -156,28 +196,60 @@ export default function HomeScreen() {
 }
 
 function HeroSection() {
-  return (
-    <View style={styles.heroSection}>
-      {/* TODO: Connect SGE API account balances */}
-      <Pressable style={styles.heroAccountContent}>
-        <Text style={styles.heroAccountType}>Personnel · EUR</Text>
-        <Text style={styles.heroAccountAmount}>€12,450.80</Text>
-        <Text style={styles.heroAccountMeta}>Solde disponible</Text>
-        <View style={styles.walletButton}>
-          <Text style={styles.walletButtonText}>Comptes et Portefeuilles</Text>
-        </View>
-      </Pressable>
+  const [activeIndex, setActiveIndex] = React.useState(0);
+  const [cardWidth, setCardWidth] = React.useState(0);
+  const scrollRef = React.useRef<ScrollView>(null);
 
-      <View style={styles.accountPageDots}>
-        <View style={[styles.accountPageDot, styles.accountPageDotActive]} />
-        <View style={styles.accountPageDot} />
-        <View style={styles.accountPageDot} />
-      </View>
+  const handleLayout = (e: LayoutChangeEvent) => {
+    setCardWidth(e.nativeEvent.layout.width);
+  };
+
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const index = cardWidth > 0 ? Math.round(e.nativeEvent.contentOffset.x / cardWidth) : 0;
+    setActiveIndex(index);
+  };
+
+  return (
+    <View style={styles.heroSection} onLayout={handleLayout}>
+      {cardWidth > 0 && (
+        <>
+          <ScrollView
+            ref={scrollRef}
+            horizontal
+            pagingEnabled
+            decelerationRate="fast"
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={cardWidth}
+            snapToAlignment="start"
+            onMomentumScrollEnd={handleScroll}
+            style={styles.heroScroll}
+          >
+            {accounts.map((account) => (
+              <Pressable key={account.type} style={[styles.heroAccountContent, { width: cardWidth }]}>
+                <Text style={styles.heroAccountType}>{account.type}</Text>
+                <Text style={styles.heroAccountAmount}>{account.balance}</Text>
+                <Text style={styles.heroAccountMeta}>{account.meta}</Text>
+                <View style={styles.walletButton}>
+                  <Text style={styles.walletButtonText}>Comptes et Portefeuilles</Text>
+                </View>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          <View style={styles.accountPageDots}>
+            {accounts.map((_, i) => (
+              <View key={i} style={[styles.accountPageDot, i === activeIndex && styles.accountPageDotActive]} />
+            ))}
+          </View>
+        </>
+      )}
     </View>
   );
 }
 
 function HomeHeader() {
+  const [query, setQuery] = React.useState("");
+
   return (
     <View style={styles.headerBlock}>
       <View style={styles.header}>
@@ -186,20 +258,81 @@ function HomeHeader() {
           <View style={styles.accountNotificationDot} />
         </Pressable>
 
-        <Pressable style={styles.searchBar}>
+        <View style={styles.searchBar}>
           <MaterialIcons name="search" size={20} color="#6B7280" />
-          <Text style={styles.searchText}>Rechercher</Text>
-        </Pressable>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Rechercher"
+            placeholderTextColor="#6B7280"
+            value={query}
+            onChangeText={setQuery}
+          />
+        </View>
 
-        <Pressable style={styles.headerUtilityButton}>
+        <Pressable style={styles.headerUtilityButton} onPress={() => router.push("/analytics")}>
           <MaterialIcons name="bar-chart" size={21} color="#111827" />
           <Text style={styles.headerUtilityLabel}>Analyse</Text>
         </Pressable>
 
-        <Pressable style={styles.headerUtilityButton}>
+        <Pressable style={styles.headerUtilityButton} onPress={() => router.push("/cards")}>
           <MaterialIcons name="credit-card" size={21} color="#111827" />
           <Text style={styles.headerUtilityLabel}>Cartes</Text>
         </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function PromotionSection() {
+  const [activeIndex, setActiveIndex] = React.useState(0);
+  const [cardWidth, setCardWidth] = React.useState(0);
+
+  const handleLayout = (e: LayoutChangeEvent) => {
+    setCardWidth(e.nativeEvent.layout.width);
+  };
+
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const index = cardWidth > 0 ? Math.round(e.nativeEvent.contentOffset.x / cardWidth) : 0;
+    setActiveIndex(index);
+  };
+
+  return (
+    <View style={styles.promoSection}>
+      <View style={styles.promoCarousel} onLayout={handleLayout}>
+        {cardWidth > 0 && (
+          <>
+            <ScrollView
+              horizontal
+              pagingEnabled
+              decelerationRate="fast"
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={cardWidth}
+              snapToAlignment="start"
+              onMomentumScrollEnd={handleScroll}
+              style={{ height: 150 }}
+            >
+              {promotions.map((promo) => (
+                <View key={promo.title} style={[styles.promoCard, { width: cardWidth }]}>
+                  <View style={styles.promoCardHeader}>
+                    <View style={styles.promoIcon}>
+                      <MaterialIcons name={promo.icon} size={18} color="#111827" />
+                    </View>
+                    <Text style={styles.promoTitle}>{promo.title}</Text>
+                  </View>
+                  <Text style={styles.promoDescription}>{promo.description}</Text>
+                  <Pressable style={styles.promoButton}>
+                    <Text style={styles.promoButtonText}>{promo.action}</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+            <View style={styles.promoDots}>
+              {promotions.map((_, i) => (
+                <View key={i} style={[styles.promoDot, i === activeIndex && styles.promoDotActive]} />
+              ))}
+            </View>
+          </>
+        )}
       </View>
     </View>
   );
@@ -218,7 +351,7 @@ function QuickActionButton({ action }: { action: QuickAction }) {
 
 function TransactionRow({ transaction }: { transaction: Transaction }) {
   return (
-    <Pressable style={styles.transactionRow}>
+    <Pressable style={styles.transactionRow} onPress={() => router.push(`/transaction-detail?title=${encodeURIComponent(transaction.title)}`)}>
       <View style={styles.transactionIcon}>
         <MaterialIcons name={transaction.icon} size={20} color="#111827" />
       </View>
@@ -348,8 +481,6 @@ const styles = StyleSheet.create({
   heroSection: {
     minHeight: 284,
     borderRadius: 32,
-    paddingHorizontal: 0,
-    paddingTop: 0,
     paddingBottom: 20,
     marginBottom: 0,
     backgroundColor: "transparent",
@@ -401,11 +532,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     backgroundColor: "#FFFFFF",
   },
-  searchText: {
-    color: "#6B7280",
+  searchInput: {
+    flex: 1,
+    color: "#111827",
     fontSize: 14,
     lineHeight: 18,
     fontWeight: "700",
+    padding: 0,
   },
   headerUtilityButton: {
     width: 42,
@@ -422,10 +555,11 @@ const styles = StyleSheet.create({
     opacity: 0,
     fontSize: 1,
   },
+  heroScroll: {
+    height: 248,
+  },
   heroAccountContent: {
-    flex: 1,
-    alignSelf: "center",
-    width: "100%",
+    height: 248,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 18,
@@ -711,5 +845,82 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 11,
+  },
+  promoSection: {
+    marginBottom: 14,
+  },
+  promoSectionTitle: {
+    color: "#05070A",
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: "900",
+    marginBottom: 12,
+  },
+  promoCarousel: {
+    overflow: "hidden",
+  },
+  promoCard: {
+    height: 150,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 18,
+    padding: 18,
+    backgroundColor: "#FFFFFF",
+    gap: 10,
+  },
+  promoCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  promoIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F3F4F6",
+  },
+  promoTitle: {
+    color: "#05070A",
+    fontSize: 15,
+    lineHeight: 19,
+    fontWeight: "900",
+  },
+  promoDescription: {
+    color: "#6B7280",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "600",
+  },
+  promoButton: {
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: "#111827",
+  },
+  promoButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: "900",
+  },
+  promoDots: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    marginTop: 10,
+  },
+  promoDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#D1D5DB",
+  },
+  promoDotActive: {
+    width: 18,
+    backgroundColor: "#111827",
   },
 });

@@ -1,664 +1,678 @@
 import * as React from "react";
 
 import { MaterialIcons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { ScreenTransition } from "@/components/mobile/screen-transition";
 import { usePhoneSafeAreaInsets } from "@/components/mobile/use-phone-safe-area";
 
 type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
-type StatusTone = "blue" | "green" | "orange" | "gray" | "red";
 
-const sgeBadges = [
-  {
-    icon: "workspace-premium" as IconName,
-    title: "Founder",
-    description: "Original SGE leadership identity.",
-  },
-  {
-    icon: "construction" as IconName,
-    title: "Early Builder",
-    description: "Built the first internal systems.",
-  },
-  {
-    icon: "fingerprint" as IconName,
-    title: "Aether Identity Tester",
-    description: "Validated mobile approval flows.",
-  },
-  {
-    icon: "dashboard" as IconName,
-    title: "Office Pioneer",
-    description: "First Aether Office workspace group.",
-  },
-  {
-    icon: "verified-user" as IconName,
-    title: "Security Trusted",
-    description: "Strong authentication posture.",
-  },
-  {
-    icon: "travel-explore" as IconName,
-    title: "Japan Expansion",
-    description: "SGE Japan planning access.",
-  },
-];
-
-const services = [
-  { name: "Aether Office", status: "Active", tone: "green" as StatusTone },
-  { name: "Aether Mail", status: "Active", tone: "green" as StatusTone },
-  { name: "Aether Bank", status: "Pending", tone: "orange" as StatusTone },
-  { name: "Aether Identity", status: "Enabled", tone: "blue" as StatusTone },
-  { name: "Aether Cloud", status: "Developer Access", tone: "gray" as StatusTone },
-];
-
-const devices = [
-  {
-    icon: "phone-iphone" as IconName,
-    name: "iPhone 15 Pro",
-    detail: "Current device · Trusted",
-    tone: "green" as StatusTone,
-  },
-  {
-    icon: "desktop-windows" as IconName,
-    name: "Debian Workstation",
-    detail: "Last seen today · Liège",
-    tone: "green" as StatusTone,
-  },
-  {
-    icon: "computer" as IconName,
-    name: "Shadow PC",
-    detail: "Needs verification",
-    tone: "orange" as StatusTone,
-  },
-];
-
-const activity = [
-  { label: "Last sign-in", value: "Today · 09:42" },
-  { label: "Last approval", value: "Aether Office · 09:43" },
-  { label: "Last post", value: "#company · Yesterday" },
-  { label: "Unread notifications", value: "7" },
-];
-
-const settings = [
-  "Security",
-  "Notifications",
-  "Appearance",
-  "Language",
-  "Privacy",
-  "Support",
-  "Sign out",
-];
-
-const statusColors: Record<StatusTone, { backgroundColor: string; color: string }> = {
-  blue: { backgroundColor: "#EAF4FF", color: "#007AFF" },
-  green: { backgroundColor: "#EAF8EF", color: "#1F8A4C" },
-  orange: { backgroundColor: "#FFF3E1", color: "#B56A00" },
-  gray: { backgroundColor: "#EEF1F5", color: "#5D6675" },
-  red: { backgroundColor: "#FDECEC", color: "#BD2E2E" },
+// TODO: Connect Aether Identity profile endpoint
+const profile = {
+  name: "Liam Dispa",
+  username: "@liamvonastoria",
+  role: "Founder & President",
+  organization: "Sky Genesis Enterprise",
+  identityStatus: "Enterprise Verified",
+  lastLogin: "12 juin 2026 à 12:27",
 };
+
+// TODO: Connect SGE API organization endpoint
+const organization = {
+  name: "Sky Genesis Enterprise",
+  organizations: 4,
+  financialAccounts: 12,
+  activeRoles: 3,
+};
+
+// TODO: Connect Aether Ledger status endpoint
+const systemStatus = {
+  identity: "Connected",
+  api: "Operational",
+  ledger: "Operational",
+};
+
+const isDeveloperAccess = true;
+
+const menuItems: { icon: IconName; label: string; badge?: string }[] = [
+  { icon: "inbox", label: "Boîte de réception", badge: "16" },
+  { icon: "person-outline", label: "Informations personnelles" },
+  { icon: "account-balance", label: "Coordonnées bancaires" },
+  { icon: "security", label: "Sécurité" },
+  { icon: "description", label: "Documents et relevés" },
+  // TODO: Connect documents and statements endpoint
+  { icon: "business", label: "Organisation" },
+  // TODO: Connect financial permissions endpoint
+  { icon: "lock-outline", label: "Permissions financières" },
+  { icon: "book", label: "Aether Ledger" },
+  // TODO: Connect inbox notifications endpoint
+  { icon: "headset-mic", label: "Support" },
+  { icon: "settings", label: "Paramètres" },
+];
+
+const developerItems: { icon: IconName; label: string }[] = [
+  { icon: "vpn-key", label: "API Keys" },
+  { icon: "webhook", label: "Webhooks" },
+  { icon: "devices", label: "Applications connectées" },
+  { icon: "science", label: "Sandbox" },
+];
 
 export default function ProfileScreen() {
   const insets = usePhoneSafeAreaInsets();
+
   return (
     <ScreenTransition direction="up">
-    <View style={styles.safeArea}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 6 }]} showsVerticalScrollIndicator={false}>
-        <ProfileHero />
-        <EnterpriseIdCard />
-
-        <SectionHeader title="Role & Organization" />
-        <Card>
-          <InfoRow label="Primary role" value="Founder & CEO" />
-          <InfoRow label="Organization" value="Sky Genesis Enterprise" />
-          <InfoRow label="Entity" value="SGE Belgium" />
-          <InfoRow label="Department" value="Executive Office" />
-          <InfoRow label="Access level" value="Global Admin" />
-        </Card>
-
-        <SectionHeader title="Badges" />
-        <View style={styles.badgeGrid}>
-          {sgeBadges.map((badge) => (
-            <BadgeCard key={badge.title} {...badge} />
-          ))}
-        </View>
-
-        <SectionHeader title="My Services" />
-        <Card>
-          {services.map((service) => (
-            <ServiceAccessRow key={service.name} {...service} />
-          ))}
-        </Card>
-
-        <SectionHeader title="Trusted Devices" action="Manage devices" />
-        <Card>
-          {devices.map((device) => (
-            <TrustedDeviceRow key={device.name} {...device} />
-          ))}
-        </Card>
-
-        <SectionHeader title="Activity" />
-        <Card>
-          {activity.map((item) => (
-            <InfoRow key={item.label} {...item} />
-          ))}
-        </Card>
-
-        <SectionHeader title="Settings & Support" />
-        <Card>
-          {settings.map((setting) => (
-            <SettingsRow key={setting} label={setting} destructive={setting === "Sign out"} />
-          ))}
-        </Card>
-      </ScrollView>
-    </View>
+      <View style={styles.safeArea}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.content,
+            { paddingTop: insets.top + 6, paddingBottom: insets.bottom + 40 },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          <Header />
+          <UserHero />
+          <SecurityCard />
+          <MenuCard />
+          {isDeveloperAccess && <DeveloperSection />}
+          <LogoutButton />
+          <Footer />
+        </ScrollView>
+      </View>
     </ScreenTransition>
   );
 }
 
-function ProfileHero() {
+function Header() {
   return (
-    <View style={styles.heroCard}>
-      <View style={styles.heroTop}>
-        <View style={styles.heroAvatar}>
-          <Text style={styles.heroAvatarText}>LD</Text>
-        </View>
-        <View style={styles.heroCopy}>
-          <Text style={styles.heroName}>Liam Dispa</Text>
-          <Text style={styles.heroRole}>Founder & CEO</Text>
-          <Text style={styles.heroOrg}>Sky Genesis Enterprise</Text>
-          <Text style={styles.heroEntity}>SGE Belgium</Text>
-        </View>
-      </View>
-
-      <View style={styles.heroMetaRow}>
-        <View style={styles.onlinePill}>
-          <View style={styles.onlineDot} />
-          <Text style={styles.onlineText}>Online</Text>
-        </View>
-        <StatusBadge label="Aether Identity Verified" tone="blue" />
-      </View>
-
-      <Pressable style={styles.enterpriseButton}>
-        <Text style={styles.enterpriseButtonText}>View Enterprise ID</Text>
-        <MaterialIcons name="chevron-right" size={20} color="#007AFF" />
+    <View style={styles.header}>
+      <Pressable style={styles.closeButton} onPress={() => router.back()}>
+        <MaterialIcons name="close" size={22} color="#FFFFFF" />
       </Pressable>
     </View>
   );
 }
 
-function EnterpriseIdCard() {
+function UserHero() {
   return (
-    <View style={styles.enterpriseCard}>
-      <View style={styles.enterpriseHeader}>
-        <View style={styles.enterpriseIcon}>
-          <MaterialIcons name="badge" size={28} color="#FFFFFF" />
+    <View style={styles.heroSection}>
+      <View style={styles.heroAvatar}>
+        <Text style={styles.heroAvatarText}>LD</Text>
+      </View>
+      <Text style={styles.heroName}>{profile.name}</Text>
+      <Text style={styles.heroUsername}>{profile.username}</Text>
+      <View style={styles.heroDivider} />
+      <Text style={styles.heroRole}>{profile.role}</Text>
+      <Text style={styles.heroOrg}>{profile.organization}</Text>
+      <View style={styles.heroVerified}>
+        <MaterialIcons name="verified" size={14} color="#1F8A4C" />
+        <Text style={styles.heroVerifiedText}>Verified Enterprise Account</Text>
+      </View>
+    </View>
+  );
+}
+
+function SecurityCard() {
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <View style={styles.cardHeaderIcon}>
+          <MaterialIcons name="shield" size={20} color="#111827" />
         </View>
-        <View style={styles.enterpriseCopy}>
-          <Text style={styles.enterpriseTitle}>Enterprise ID</Text>
-          <Text style={styles.enterpriseSubtitle}>Verified by Aether Identity</Text>
-          <Text style={styles.enterpriseDetail}>Trusted device enabled · MFA active</Text>
+        <Text style={styles.cardTitle}>Sécurité du compte</Text>
+      </View>
+
+      <View style={styles.securityRows}>
+        <View style={styles.securityRow}>
+          <MaterialIcons name="check-circle" size={16} color="#1F8A4C" />
+          <Text style={styles.securityRowText}>Face ID activé</Text>
+        </View>
+        <View style={styles.securityRow}>
+          <MaterialIcons name="check-circle" size={16} color="#1F8A4C" />
+          <Text style={styles.securityRowText}>MFA activé</Text>
+        </View>
+        <View style={styles.securityRow}>
+          <MaterialIcons name="access-time" size={16} color="#6B7280" />
+          <Text style={styles.securityRowTextSecondary}>
+            Dernière connexion : aujourd'hui à 12:27
+          </Text>
         </View>
       </View>
-      <View style={styles.enterpriseDivider} />
-      <View style={styles.idStatusRow}>
-        <MiniStatus label="Identity" value="Verified" tone="green" />
-        <MiniStatus label="Device" value="Trusted" tone="blue" />
-        <MiniStatus label="Security" value="Strong" tone="green" />
+    </View>
+  );
+}
+
+function MenuCard() {
+  return (
+    <View style={styles.card}>
+      {menuItems.map((item, index) => (
+        <Pressable
+          key={item.label}
+          style={[
+            styles.menuRow,
+            index < menuItems.length - 1 && styles.menuRowBorder,
+          ]}
+        >
+          <View style={styles.menuRowLeading}>
+            <View style={styles.menuIcon}>
+              <MaterialIcons name={item.icon} size={20} color="#111827" />
+            </View>
+            <Text style={styles.menuLabel}>{item.label}</Text>
+          </View>
+          <View style={styles.menuRowTrailing}>
+            {item.badge ? (
+              <View style={styles.menuBadge}>
+                <Text style={styles.menuBadgeText}>{item.badge}</Text>
+              </View>
+            ) : null}
+            <MaterialIcons name="chevron-right" size={18} color="#9CA3AF" />
+          </View>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+function DeveloperSection() {
+  return (
+    <View style={styles.devSection}>
+      <Text style={styles.devSectionTitle}>Développeur</Text>
+      <View style={styles.card}>
+        {developerItems.map((item, index) => (
+          <Pressable
+            key={item.label}
+            style={[
+              styles.menuRow,
+              index < developerItems.length - 1 && styles.menuRowBorder,
+            ]}
+          >
+            <View style={styles.menuRowLeading}>
+              <View style={styles.menuIconDev}>
+                <MaterialIcons name={item.icon} size={18} color="#6B7280" />
+              </View>
+              <Text style={styles.devLabel}>{item.label}</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={18} color="#9CA3AF" />
+          </Pressable>
+        ))}
       </View>
     </View>
   );
 }
 
-function SectionHeader({ action, title }: { action?: string; title: string }) {
+function LogoutButton() {
   return (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {action ? <Text style={styles.sectionAction}>{action}</Text> : null}
-    </View>
-  );
-}
-
-function Card({ children }: { children: React.ReactNode }) {
-  return <View style={styles.card}>{children}</View>;
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
-    </View>
-  );
-}
-
-function StatusBadge({ label, tone }: { label: string; tone: StatusTone }) {
-  const colors = statusColors[tone];
-
-  return (
-    <View style={[styles.statusBadge, { backgroundColor: colors.backgroundColor }]}>
-      <Text style={[styles.statusText, { color: colors.color }]}>{label}</Text>
-    </View>
-  );
-}
-
-function MiniStatus({ label, tone, value }: { label: string; tone: StatusTone; value: string }) {
-  const colors = statusColors[tone];
-
-  return (
-    <View style={styles.miniStatus}>
-      <Text style={styles.miniStatusLabel}>{label}</Text>
-      <Text style={[styles.miniStatusValue, { color: colors.color }]}>{value}</Text>
-    </View>
-  );
-}
-
-function BadgeCard({
-  description,
-  icon,
-  title,
-}: {
-  description: string;
-  icon: IconName;
-  title: string;
-}) {
-  return (
-    <View style={styles.badgeCard}>
-      <View style={styles.badgeIcon}>
-        <MaterialIcons name={icon} size={23} color="#007AFF" />
-      </View>
-      <Text style={styles.badgeTitle}>{title}</Text>
-      <Text style={styles.badgeDescription}>{description}</Text>
-    </View>
-  );
-}
-
-function ServiceAccessRow({
-  name,
-  status,
-  tone,
-}: {
-  name: string;
-  status: string;
-  tone: StatusTone;
-}) {
-  return (
-    <View style={styles.serviceRow}>
-      <Text style={styles.serviceName}>{name}</Text>
-      <StatusBadge label={status} tone={tone} />
-    </View>
-  );
-}
-
-function TrustedDeviceRow({
-  detail,
-  icon,
-  name,
-  tone,
-}: {
-  detail: string;
-  icon: IconName;
-  name: string;
-  tone: StatusTone;
-}) {
-  return (
-    <View style={styles.deviceRow}>
-      <View style={styles.deviceIcon}>
-        <MaterialIcons name={icon} size={22} color="#007AFF" />
-      </View>
-      <View style={styles.deviceCopy}>
-        <Text style={styles.deviceName}>{name}</Text>
-        <Text style={styles.deviceDetail}>{detail}</Text>
-      </View>
-      <StatusDot tone={tone} />
-    </View>
-  );
-}
-
-function StatusDot({ tone }: { tone: StatusTone }) {
-  const colors = statusColors[tone];
-
-  return <View style={[styles.statusDot, { backgroundColor: colors.color }]} />;
-}
-
-function SettingsRow({ destructive, label }: { destructive?: boolean; label: string }) {
-  return (
-    <Pressable style={styles.settingsRow}>
-      <Text style={[styles.settingsLabel, destructive && styles.settingsDestructive]}>{label}</Text>
-      <MaterialIcons name="chevron-right" size={22} color={destructive ? "#BD2E2E" : "#9CA3AF"} />
+    <Pressable style={styles.logoutButton}>
+      <MaterialIcons name="logout" size={18} color="#BD2E2E" />
+      <Text style={styles.logoutText}>Se déconnecter</Text>
     </Pressable>
+  );
+  // TODO: Connect logout with Aether Identity
+}
+
+function Footer() {
+  return (
+    <View style={styles.footer}>
+      <Text style={styles.footerTitle}>Aether Bank</Text>
+      <Text style={styles.footerVersion}>Version 1.0.0</Text>
+      <Text style={styles.footerLogin}>
+        Dernière connexion : {profile.lastLogin}
+      </Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F5F5F7",
+    backgroundColor: "#F5F7FA",
   },
   content: {
     paddingHorizontal: 20,
-    paddingBottom: 116,
   },
-  heroCard: {
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 18,
-    backgroundColor: "#FFFFFF",
-  },
-  heroTop: {
+  header: {
     flexDirection: "row",
-    gap: 16,
     alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
   },
-  heroAvatar: {
-    width: 76,
-    height: 76,
-    borderRadius: 26,
+  closeButton: {
+    width: 42,
+    height: 42,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#007AFF",
+    borderRadius: 21,
+    backgroundColor: "#111827",
   },
-  heroAvatarText: {
-    color: "#FFFFFF",
-    fontSize: 24,
-    fontWeight: "900",
-  },
-  heroCopy: {
-    flex: 1,
-  },
-  heroName: {
-    color: "#05070A",
-    fontSize: 27,
-    lineHeight: 32,
-    fontWeight: "900",
-  },
-  heroRole: {
-    color: "#111827",
-    fontSize: 16,
-    lineHeight: 21,
-    fontWeight: "800",
-    marginTop: 2,
-  },
-  heroOrg: {
-    color: "#4B5563",
-    fontSize: 14,
-    lineHeight: 19,
-    fontWeight: "600",
-    marginTop: 4,
-  },
-  heroEntity: {
-    color: "#6B7280",
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: "600",
-  },
-  heroMetaRow: {
+  headerRight: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 16,
   },
-  onlinePill: {
+  identityPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: "#EAF8EF",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: "#F3F4F6",
   },
-  onlineDot: {
+  identityDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: "#22C55E",
   },
-  onlineText: {
-    color: "#1F8A4C",
-    fontSize: 12,
-    lineHeight: 14,
+  identityPillText: {
+    color: "#374151",
+    fontSize: 13,
+    lineHeight: 17,
     fontWeight: "800",
   },
-  enterpriseButton: {
+  heroSection: {
+    alignItems: "center",
+    paddingTop: 6,
+    paddingBottom: 20,
+    marginBottom: 4,
+  },
+  heroAvatar: {
+    width: 80,
+    height: 80,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 28,
+    marginBottom: 14,
+    backgroundColor: "#111827",
+  },
+  heroAvatarText: {
+    color: "#FFFFFF",
+    fontSize: 26,
+    fontWeight: "900",
+  },
+  heroName: {
+    color: "#05070A",
+    fontSize: 26,
+    lineHeight: 31,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  heroUsername: {
+    color: "#6B7280",
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "600",
+    marginTop: 2,
+    textAlign: "center",
+  },
+  heroDivider: {
+    width: 28,
+    height: 3,
+    borderRadius: 2,
+    marginVertical: 12,
+    backgroundColor: "#D1D5DB",
+  },
+  heroRole: {
+    color: "#111827",
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  heroOrg: {
+    color: "#6B7280",
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: "600",
+    marginTop: 2,
+    textAlign: "center",
+  },
+  heroVerified: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 14,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: "#EAF8EF",
+  },
+  heroVerifiedText: {
+    color: "#1F8A4C",
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: "900",
+  },
+  cardIdentity: {
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 14,
+    backgroundColor: "#087BEA",
+  },
+  cardIdentityTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 14,
+  },
+  cardIdentityIcon: {
+    width: 44,
     height: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.18)",
+  },
+  cardIdentityCopy: {
+    flex: 1,
+  },
+  cardIdentityTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: "900",
+  },
+  cardIdentitySubtitle: {
+    color: "#D8EBFF",
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  cardIdentityBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    marginBottom: 14,
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+  },
+  cardIdentityBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "900",
+  },
+  cardIdentityFeatures: {
+    gap: 8,
+    marginBottom: 16,
+  },
+  featureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  featureDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255, 255, 255, 0.5)",
+  },
+  featureRowText: {
+    color: "#D8EBFF",
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "700",
+  },
+  cardIdentityButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     borderRadius: 14,
     paddingHorizontal: 14,
-    marginTop: 16,
-    backgroundColor: "#EAF4FF",
+    paddingVertical: 11,
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
   },
-  enterpriseButtonText: {
-    color: "#007AFF",
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: "900",
-  },
-  enterpriseCard: {
-    borderRadius: 22,
-    padding: 18,
-    marginBottom: 24,
-    backgroundColor: "#087BEA",
-  },
-  enterpriseHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 13,
-  },
-  enterpriseIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.18)",
-  },
-  enterpriseCopy: {
-    flex: 1,
-  },
-  enterpriseTitle: {
+  cardIdentityButtonText: {
     color: "#FFFFFF",
-    fontSize: 20,
-    lineHeight: 25,
-    fontWeight: "900",
-  },
-  enterpriseSubtitle: {
-    color: "#D8EBFF",
-    fontSize: 14,
-    lineHeight: 19,
-    fontWeight: "700",
-  },
-  enterpriseDetail: {
-    color: "#D8EBFF",
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: "500",
-  },
-  enterpriseDivider: {
-    height: 1,
-    marginVertical: 16,
-    backgroundColor: "rgba(255, 255, 255, 0.24)",
-  },
-  idStatusRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  miniStatus: {
-    flex: 1,
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    backgroundColor: "rgba(255, 255, 255, 0.14)",
-  },
-  miniStatusLabel: {
-    color: "#D8EBFF",
-    textAlign: "center",
-    fontSize: 11,
-    lineHeight: 15,
-    fontWeight: "700",
-  },
-  miniStatusValue: {
-    textAlign: "center",
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: "900",
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    color: "#05070A",
-    fontSize: 22,
-    lineHeight: 27,
-    fontWeight: "900",
-  },
-  sectionAction: {
-    color: "#007AFF",
     fontSize: 14,
     lineHeight: 18,
-    fontWeight: "800",
+    fontWeight: "900",
   },
   card: {
     borderWidth: 1,
     borderColor: "#D1D5DB",
     borderRadius: 18,
     padding: 16,
-    marginBottom: 24,
+    marginBottom: 14,
     backgroundColor: "#FFFFFF",
   },
-  infoRow: {
+  cardHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 14,
-    paddingVertical: 9,
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 14,
   },
-  infoLabel: {
-    color: "#6B7280",
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: "600",
-  },
-  infoValue: {
-    flex: 1,
-    color: "#111827",
-    textAlign: "right",
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: "900",
-  },
-  statusBadge: {
-    alignSelf: "flex-start",
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-  },
-  statusText: {
-    fontSize: 12,
-    lineHeight: 14,
-    fontWeight: "900",
-  },
-  badgeGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: 12,
-    marginBottom: 24,
-  },
-  badgeCard: {
-    width: "48%",
-    minHeight: 142,
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 18,
-    padding: 14,
-    gap: 8,
-    backgroundColor: "#FFFFFF",
-  },
-  badgeIcon: {
-    width: 39,
-    height: 39,
-    borderRadius: 13,
+  cardHeaderIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#EAF4FF",
+    backgroundColor: "#F3F4F6",
   },
-  badgeTitle: {
-    color: "#111827",
-    fontSize: 15,
-    lineHeight: 19,
+  cardTitle: {
+    color: "#05070A",
+    fontSize: 16,
+    lineHeight: 21,
     fontWeight: "900",
   },
-  badgeDescription: {
+  orgStats: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    marginBottom: 14,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: "#F5F7FA",
+  },
+  orgDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: "#D1D5DB",
+  },
+  statItem: {
+    alignItems: "center",
+    gap: 2,
+  },
+  statValue: {
+    color: "#05070A",
+    fontSize: 22,
+    lineHeight: 27,
+    fontWeight: "900",
+  },
+  statLabel: {
     color: "#6B7280",
-    fontSize: 12,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "800",
+  },
+  cardActionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#111827",
+  },
+  cardActionButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: "900",
+  },
+  securityRows: {
+    gap: 10,
+  },
+  securityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  securityRowText: {
+    color: "#111827",
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "800",
+  },
+  securityRowTextSecondary: {
+    color: "#6B7280",
+    fontSize: 13,
     lineHeight: 17,
     fontWeight: "600",
   },
-  serviceRow: {
+  menuRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
-    paddingVertical: 10,
+    paddingVertical: 13,
   },
-  serviceName: {
+  menuRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  menuRowLeading: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    flex: 1,
+  },
+  menuIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F3F4F6",
+  },
+  menuLabel: {
     color: "#111827",
     fontSize: 15,
     lineHeight: 20,
     fontWeight: "800",
-  },
-  deviceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 10,
-  },
-  deviceIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#EAF4FF",
-  },
-  deviceCopy: {
     flex: 1,
   },
-  deviceName: {
-    color: "#111827",
+  menuRowTrailing: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  menuBadge: {
+    minWidth: 22,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#111827",
+  },
+  menuBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    lineHeight: 13,
+    fontWeight: "900",
+  },
+  devSection: {
+    marginBottom: 14,
+  },
+  devSectionTitle: {
+    color: "#6B7280",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    marginLeft: 2,
+  },
+  menuIconDev: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F3F4F6",
+  },
+  devLabel: {
+    color: "#6B7280",
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "800",
+  },
+  logoutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 18,
+    paddingVertical: 16,
+    marginBottom: 24,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+  },
+  logoutText: {
+    color: "#BD2E2E",
     fontSize: 15,
     lineHeight: 20,
     fontWeight: "900",
   },
-  deviceDetail: {
-    color: "#6B7280",
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: "600",
-  },
-  statusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  settingsRow: {
-    minHeight: 46,
-    flexDirection: "row",
+  footer: {
     alignItems: "center",
-    justifyContent: "space-between",
+    paddingBottom: 8,
+    gap: 4,
   },
-  settingsLabel: {
-    color: "#111827",
-    fontSize: 15,
-    lineHeight: 20,
+  footerTitle: {
+    color: "#6B7280",
+    fontSize: 14,
+    lineHeight: 18,
     fontWeight: "800",
   },
-  settingsDestructive: {
-    color: "#BD2E2E",
+  footerVersion: {
+    color: "#6B7280",
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: "600",
+  },
+  footerStatus: {
+    alignItems: "center",
+    gap: 2,
+    marginTop: 6,
+  },
+  footerStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  footerDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+  },
+  footerStatusLabel: {
+    color: "#6B7280",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "700",
+  },
+  footerStatusValue: {
+    color: "#9CA3AF",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "600",
+  },
+  footerLogin: {
+    color: "#9CA3AF",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "600",
+    marginTop: 4,
   },
 });

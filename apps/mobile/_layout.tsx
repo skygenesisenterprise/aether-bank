@@ -88,7 +88,8 @@ function MobileLayoutTabs() {
         },
         tabBarItemStyle: {
           borderRadius: 0,
-          marginHorizontal: 2,
+          flex: 1,
+          paddingHorizontal: 4,
         },
       }}
     >
@@ -106,7 +107,7 @@ function MobileLayoutTabs() {
       />
       <Tabs.Screen name="index" options={{ href: null }} />
       <Tabs.Screen
-        name="feed"
+        name="invest"
         options={{
           title: "Investir",
           tabBarLabel: "Investir",
@@ -116,7 +117,7 @@ function MobileLayoutTabs() {
         }}
       />
       <Tabs.Screen
-        name="chat/index"
+        name="transferts"
         options={{
           title: "Virements",
           tabBarLabel: "Virements",
@@ -126,7 +127,7 @@ function MobileLayoutTabs() {
         }}
       />
       <Tabs.Screen
-        name="services/index"
+        name="mes-cartes"
         options={{
           title: "Cartes",
           tabBarLabel: "Cartes",
@@ -141,20 +142,22 @@ function MobileLayoutTabs() {
           title: "Hub",
           tabBarLabel: "Hub",
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="hub" color={color} focused={focused} />
+            <TabIcon name="account-circle" color={color} focused={focused} />
           ),
         }}
       />
+      <Tabs.Screen name="cards" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="apps" options={{ href: null }} />
       <Tabs.Screen name="account" options={{ href: null }} />
-      <Tabs.Screen name="chat/[id]" options={{ href: null }} />
-      <Tabs.Screen name="services/[id]" options={{ href: null }} />
       <Tabs.Screen name="notifications" options={{ href: null }} />
       <Tabs.Screen name="_dashboard" options={{ href: null }} />
       <Tabs.Screen name="news-detail" options={{ href: null }} />
       <Tabs.Screen name="product-detail" options={{ href: null }} />
       <Tabs.Screen name="guilderia-developer" options={{ href: null }} />
       <Tabs.Screen name="app-detail" options={{ href: null }} />
+      <Tabs.Screen name="analytics" options={{ href: null, tabBarStyle: { display: "none" } }} />
+      <Tabs.Screen name="transaction-detail" options={{ href: null }} />
+      <Tabs.Screen name="transactions" options={{ href: null }} />
       <Tabs.Screen name="settings" options={{ href: null }} />
       <Tabs.Screen
         name="login"
@@ -167,6 +170,15 @@ function MobileLayoutTabs() {
       />
       <Tabs.Screen
         name="register"
+        options={{
+          href: null,
+          tabBarStyle: {
+            display: "none",
+          },
+        }}
+      />
+      <Tabs.Screen
+        name="unlock"
         options={{
           href: null,
           tabBarStyle: {
