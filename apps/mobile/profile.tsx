@@ -37,27 +37,20 @@ const systemStatus = {
 
 const isDeveloperAccess = true;
 
-const menuItems: { icon: IconName; label: string; badge?: string; route?: "/profile-notifications" }[] = [
+const menuItems: { icon: IconName; label: string; badge?: string; route?: "/profile-notifications" | "/profile-infos" | "/profile-bank" | "/profile-security" | "/profile-document" | "/profile-org" | "/profile-financial" | "/profile-ledger" | "/profile-support" | "/profile-settings" }[] = [
   { icon: "inbox", label: "Boîte de réception", badge: "16", route: "/profile-notifications" },
-  { icon: "person-outline", label: "Informations personnelles" },
-  { icon: "account-balance", label: "Coordonnées bancaires" },
-  { icon: "security", label: "Sécurité" },
-  { icon: "description", label: "Documents et relevés" },
+  { icon: "person-outline", label: "Informations personnelles", route: "/profile-infos" },
+  { icon: "account-balance", label: "Coordonnées bancaires", route: "/profile-bank" },
+  { icon: "security", label: "Sécurité", route: "/profile-security" },
+  { icon: "description", label: "Documents et relevés", route: "/profile-document" },
   // TODO: Connect documents and statements endpoint
-  { icon: "business", label: "Organisation" },
+  { icon: "business", label: "Organisation", route: "/profile-org" },
   // TODO: Connect financial permissions endpoint
-  { icon: "lock-outline", label: "Permissions financières" },
-  { icon: "book", label: "Aether Ledger" },
+  { icon: "lock-outline", label: "Permissions financières", route: "/profile-financial" },
+  { icon: "book", label: "Aether Ledger", route: "/profile-ledger" },
   // TODO: Connect inbox notifications endpoint
-  { icon: "headset-mic", label: "Support" },
-  { icon: "settings", label: "Paramètres" },
-];
-
-const developerItems: { icon: IconName; label: string }[] = [
-  { icon: "vpn-key", label: "API Keys" },
-  { icon: "webhook", label: "Webhooks" },
-  { icon: "devices", label: "Applications connectées" },
-  { icon: "science", label: "Sandbox" },
+  { icon: "headset-mic", label: "Support", route: "/profile-support" },
+  { icon: "settings", label: "Paramètres", route: "/profile-settings" },
 ];
 
 export default function ProfileScreen() {
@@ -78,7 +71,6 @@ export default function ProfileScreen() {
           <UserHero />
           <SecurityCard />
           <MenuCard />
-          {isDeveloperAccess && <DeveloperSection />}
           <LogoutButton onPress={signOut} />
           <Footer />
         </ScrollView>
@@ -178,33 +170,6 @@ function MenuCard() {
           </View>
         </Pressable>
       ))}
-    </View>
-  );
-}
-
-function DeveloperSection() {
-  return (
-    <View style={styles.devSection}>
-      <Text style={styles.devSectionTitle}>Développeur</Text>
-      <View style={styles.card}>
-        {developerItems.map((item, index) => (
-          <Pressable
-            key={item.label}
-            style={[
-              styles.menuRow,
-              index < developerItems.length - 1 && styles.menuRowBorder,
-            ]}
-          >
-            <View style={styles.menuRowLeading}>
-              <View style={styles.menuIconDev}>
-                <MaterialIcons name={item.icon} size={18} color="#6B7280" />
-              </View>
-              <Text style={styles.devLabel}>{item.label}</Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={18} color="#9CA3AF" />
-          </Pressable>
-        ))}
-      </View>
     </View>
   );
 }

@@ -24,10 +24,10 @@ const destinationAccounts = [
 ];
 
 const topUpMethods = [
-  { title: "Recharger par virement SEPA", description: "Recevez de l'argent via vos coordonnées bancaires.", icon: "account-balance" as const },
-  { title: "Recevoir via Wero", description: "Paiement instantané européen.", icon: "send" as const },
-  { title: "Depuis un compte SGE", description: "Déplacez des fonds depuis un espace autorisé.", icon: "business" as const },
-  { title: "Depuis un coffre", description: "Retirez de l'argent depuis un Vault.", icon: "lock" as const },
+  { title: "Recharger par virement SEPA", description: "Recevez de l'argent via vos coordonnées bancaires.", icon: "account-balance" as const, route: "/account-sepa" as const },
+  { title: "Recevoir via Wero", description: "Paiement instantané européen.", icon: "send" as const, route: "/account-wero" as const },
+  { title: "Depuis un compte SGE", description: "Déplacez des fonds depuis un espace autorisé.", icon: "business" as const, route: "/account-enterprise" as const },
+  { title: "Depuis un coffre", description: "Retirez de l'argent depuis un Vault.", icon: "lock" as const, route: "/account-vault" as const },
   { title: "Générer des coordonnées bancaires", description: "Afficher IBAN, BIC et titulaire.", icon: "description" as const },
 ];
 
@@ -931,7 +931,10 @@ function AddMoneyPanel({ account, onClose }: { account: Account; onClose: () => 
             key={method.title}
             style={styles.methodRow}
             onPress={() => {
-              if (method.title === "Générer des coordonnées bancaires") {
+              if (method.route) {
+                router.push(method.route);
+                onClose();
+              } else if (method.title === "Générer des coordonnées bancaires") {
                 setShowIBAN((prev) => !prev);
               }
             }}
