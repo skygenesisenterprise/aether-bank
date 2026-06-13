@@ -168,10 +168,14 @@ function MobileLayoutTabs() {
         name="profile"
         options={{ href: null, tabBarStyle: { display: "none" } }}
       />
+      <Tabs.Screen name="profile-notifications" options={{ href: null, tabBarStyle: { display: "none" } }} />
+      <Tabs.Screen name="profile-infos" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="cards" options={{ href: null, tabBarStyle: { display: "none" } }} />
+      <Tabs.Screen name="cards-detail" options={{ href: null, tabBarStyle: { display: "none" } }} />
+      <Tabs.Screen name="cards-create" options={{ href: null, tabBarStyle: { display: "none" } }} />
+      <Tabs.Screen name="cards-create-option" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="account" options={{ href: null }} />
       <Tabs.Screen name="account-detail" options={{ href: null, tabBarStyle: { display: "none" } }} />
-      <Tabs.Screen name="notifications" options={{ href: null }} />
       <Tabs.Screen name="_dashboard" options={{ href: null }} />
       <Tabs.Screen name="product-detail" options={{ href: null }} />
       <Tabs.Screen name="analytics" options={{ href: null, tabBarStyle: { display: "none" } }} />

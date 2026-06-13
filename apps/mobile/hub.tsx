@@ -294,9 +294,8 @@ function InfrastructureCard() {
 function HubFooter() {
   return (
     <View style={styles.footer}>
-      <Text style={styles.footerTitle}>Aether Bank Hub</Text>
+      <Text style={styles.footerTitle}>Aether Bank</Text>
       <Text style={styles.footerVersion}>Version 1.0.0</Text>
-      <Text style={styles.footerMock}>Données simulées</Text>
     </View>
   );
 }

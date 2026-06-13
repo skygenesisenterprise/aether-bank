@@ -37,8 +37,8 @@ const systemStatus = {
 
 const isDeveloperAccess = true;
 
-const menuItems: { icon: IconName; label: string; badge?: string }[] = [
-  { icon: "inbox", label: "Boîte de réception", badge: "16" },
+const menuItems: { icon: IconName; label: string; badge?: string; route?: "/profile-notifications" }[] = [
+  { icon: "inbox", label: "Boîte de réception", badge: "16", route: "/profile-notifications" },
   { icon: "person-outline", label: "Informations personnelles" },
   { icon: "account-balance", label: "Coordonnées bancaires" },
   { icon: "security", label: "Sécurité" },
@@ -152,6 +152,11 @@ function MenuCard() {
       {menuItems.map((item, index) => (
         <Pressable
           key={item.label}
+          onPress={() => {
+            if (item.route) {
+              router.push(item.route);
+            }
+          }}
           style={[
             styles.menuRow,
             index < menuItems.length - 1 && styles.menuRowBorder,

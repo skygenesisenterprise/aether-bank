@@ -2,7 +2,7 @@ import * as React from "react";
 
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { Alert, LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Animated as NativeAnimated, LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent, PanResponder, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { Bar, BarChart, ResponsiveContainer, XAxis } from "recharts";
 
@@ -56,6 +56,25 @@ interface BankCard {
   status: string;
   last4: string;
   icon: IconName;
+}
+
+type HomeWidgetId =
+  | "activity"
+  | "monthlySpending"
+  | "beneficiaries"
+  | "cards"
+  | "categorySpending"
+  | "scheduledTransfers"
+  | "savingGoals"
+  | "recentDocuments";
+
+interface HomeWidgetConfig {
+  id: HomeWidgetId;
+  enabled: boolean;
+}
+
+interface HomeWidgetDefinition {
+  Component: React.ComponentType;
 }
 
 const quickActions: QuickAction[] = [
@@ -204,12 +223,60 @@ const recentDocuments: RecentDocument[] = [
   { title: "Attestation de compte", date: "3 mai 2026", icon: "verified" },
 ];
 
+const defaultHomeWidgets: HomeWidgetConfig[] = [
+  { id: "activity", enabled: true },
+  { id: "monthlySpending", enabled: true },
+  { id: "beneficiaries", enabled: true },
+  { id: "cards", enabled: true },
+  { id: "categorySpending", enabled: true },
+  { id: "scheduledTransfers", enabled: true },
+  { id: "savingGoals", enabled: true },
+  { id: "recentDocuments", enabled: true },
+];
+
+const homeWidgetRegistry: Record<HomeWidgetId, HomeWidgetDefinition> = {
+  activity: { Component: ActivitySection },
+  monthlySpending: { Component: MonthlySpendingSection },
+  beneficiaries: { Component: FrequentBeneficiariesSection },
+  cards: { Component: CardsSection },
+  categorySpending: { Component: CategorySpendingSection },
+  scheduledTransfers: { Component: ScheduledTransfersSection },
+  savingGoals: { Component: SavingGoalsSection },
+  recentDocuments: { Component: RecentDocumentsSection },
+};
+
+const HOME_HEADER_HEIGHT = 62;
+
+function moveWidget<T>(items: T[], fromIndex: number, toIndex: number) {
+  if (fromIndex === toIndex) {
+    return items;
+  }
+
+  const nextItems = [...items];
+  const [movedItem] = nextItems.splice(fromIndex, 1);
+
+  nextItems.splice(toIndex, 0, movedItem);
+
+  return nextItems;
+}
+
 export default function HomeScreen() {
   const insets = usePhoneSafeAreaInsets();
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [activeQuickAction, setActiveQuickAction] = React.useState<QuickActionType | null>(null);
   const [refreshing, setRefreshing] = React.useState(false);
+  const [homeWidgets, setHomeWidgets] = React.useState(defaultHomeWidgets);
+  const [draggingWidgetId, setDraggingWidgetId] = React.useState<HomeWidgetId | null>(null);
   const portal = usePortal();
+  const widgetLayoutsRef = React.useRef<Partial<Record<HomeWidgetId, { y: number; height: number }>>>({});
+  const homeWidgetsRef = React.useRef(homeWidgets);
+  const draggingWidgetIdRef = React.useRef<HomeWidgetId | null>(null);
+  const dragStartIndexRef = React.useRef<number | null>(null);
+  const dragTranslateY = React.useRef(new NativeAnimated.Value(0)).current;
+
+  React.useEffect(() => {
+    homeWidgetsRef.current = homeWidgets;
+  }, [homeWidgets]);
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
@@ -220,6 +287,56 @@ export default function HomeScreen() {
   const handleCloseQuickAction = React.useCallback(() => {
     setActiveQuickAction(null);
   }, []);
+
+  const handleWidgetLayout = React.useCallback((widgetId: HomeWidgetId, event: LayoutChangeEvent) => {
+    const { y, height } = event.nativeEvent.layout;
+    widgetLayoutsRef.current[widgetId] = { y, height };
+  }, []);
+
+  const handleWidgetDragStart = React.useCallback((widgetId: HomeWidgetId) => {
+    const currentIndex = homeWidgetsRef.current.findIndex((widget) => widget.id === widgetId);
+    if (currentIndex === -1) {
+      return;
+    }
+
+    dragStartIndexRef.current = currentIndex;
+    draggingWidgetIdRef.current = widgetId;
+    dragTranslateY.setValue(0);
+    setDraggingWidgetId(widgetId);
+  }, [dragTranslateY]);
+
+  const handleWidgetDragEnd = React.useCallback((dragOffsetY: number) => {
+    const draggedWidgetId = draggingWidgetIdRef.current;
+    const startIndex = dragStartIndexRef.current;
+
+    if (draggedWidgetId === null || startIndex === null) {
+      dragTranslateY.setValue(0);
+      setDraggingWidgetId(null);
+      return;
+    }
+
+    const widgetLayouts = homeWidgetsRef.current
+      .map((widget) => ({
+        id: widget.id,
+        layout: widgetLayoutsRef.current[widget.id],
+      }))
+      .filter((widget): widget is { id: HomeWidgetId; layout: { y: number; height: number } } => widget.layout !== undefined);
+
+    const draggedLayout = widgetLayoutsRef.current[draggedWidgetId];
+    let targetIndex = startIndex;
+
+    if (draggedLayout) {
+      const draggedCenterY = draggedLayout.y + dragOffsetY + draggedLayout.height / 2;
+      const foundIndex = widgetLayouts.findIndex((widget) => draggedCenterY < widget.layout.y + widget.layout.height / 2);
+      targetIndex = foundIndex === -1 ? widgetLayouts.length - 1 : foundIndex;
+    }
+
+    setHomeWidgets((currentWidgets) => moveWidget(currentWidgets, startIndex, targetIndex));
+    dragStartIndexRef.current = null;
+    draggingWidgetIdRef.current = null;
+    setDraggingWidgetId(null);
+    dragTranslateY.setValue(0);
+  }, [dragTranslateY]);
 
   React.useEffect(() => {
     switch (activeQuickAction) {
@@ -243,9 +360,16 @@ export default function HomeScreen() {
   return (
     <ScreenTransition>
       <View style={styles.safeArea}>
-        <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 6 }]} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6B7280" colors={["#6B7280"]} />}>
+        <View style={[styles.fixedHeader, { paddingTop: insets.top + 6 }]}>
           <HomeHeader />
+        </View>
 
+        <ScrollView
+          contentContainerStyle={[styles.content, { paddingTop: insets.top + 6 + HOME_HEADER_HEIGHT }]}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={draggingWidgetId === null}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6B7280" colors={["#6B7280"]} />}
+        >
           <HeroSection activeIndex={activeIndex} onIndexChange={setActiveIndex} />
 
           <View style={styles.quickActionRow}>
@@ -256,32 +380,25 @@ export default function HomeScreen() {
 
           <PromotionSection />
 
-          <View style={styles.postCard}>
-            <View style={styles.postHeader}>
-              <Text style={styles.postTitle}>Activite recente</Text>
-              <Pressable onPress={() => router.push("/transactions")}>
-                <Text style={styles.postAction}>Voir tout</Text>
-              </Pressable>
-            </View>
-            {transactions.slice(0, 10).map((transaction) => (
-              <TransactionRow key={`${transaction.title}-${transaction.amount}`} transaction={transaction} />
-            ))}
-          </View>
+          {homeWidgets
+            .filter((widget) => widget.enabled)
+            .map((widget) => {
+              const widgetDefinition = homeWidgetRegistry[widget.id];
+              return (
+                <DraggableWidget
+                  key={widget.id}
+                  isDragging={draggingWidgetId === widget.id}
+                  translateY={dragTranslateY}
+                  widgetId={widget.id}
+                  WidgetComponent={widgetDefinition.Component}
+                  onDragEnd={handleWidgetDragEnd}
+                  onDragStart={handleWidgetDragStart}
+                  onLayout={handleWidgetLayout}
+                />
+              );
+            })}
 
-          <MonthlySpendingSection />
-
-          <FrequentBeneficiariesSection />
-
-          <CardsSection />
-
-          <CategorySpendingSection />
-
-          <ScheduledTransfersSection />
-
-          <SavingGoalsSection />
-
-          <RecentDocumentsSection />
-
+          <AddWidgetButton />
         </ScrollView>
       </View>
     </ScreenTransition>
@@ -466,6 +583,76 @@ function TransactionRow({ transaction }: { transaction: Transaction }) {
   );
 }
 
+function DraggableWidget({
+  widgetId,
+  WidgetComponent,
+  isDragging,
+  translateY,
+  onLayout,
+  onDragStart,
+  onDragEnd,
+}: {
+  widgetId: HomeWidgetId;
+  WidgetComponent: React.ComponentType;
+  isDragging: boolean;
+  translateY: NativeAnimated.Value;
+  onLayout: (widgetId: HomeWidgetId, event: LayoutChangeEvent) => void;
+  onDragStart: (widgetId: HomeWidgetId) => void;
+  onDragEnd: (dragOffsetY: number) => void;
+}) {
+  const panResponder = React.useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: () => {
+          onDragStart(widgetId);
+        },
+        onPanResponderMove: (_, gestureState) => {
+          translateY.setValue(gestureState.dy);
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          onDragEnd(gestureState.dy);
+        },
+        onPanResponderTerminate: (_, gestureState) => {
+          onDragEnd(gestureState.dy);
+        },
+      }),
+    [onDragEnd, onDragStart, translateY, widgetId],
+  );
+
+  return (
+    <NativeAnimated.View
+      onLayout={(event) => onLayout(widgetId, event)}
+      style={[
+        styles.widgetSlot,
+        styles.widgetCardContainer,
+        isDragging && styles.widgetCardDragging,
+        isDragging ? { transform: [{ translateY }] } : null,
+      ]}
+      {...panResponder.panHandlers}
+    >
+      <WidgetComponent />
+    </NativeAnimated.View>
+  );
+}
+
+function ActivitySection() {
+  return (
+    <View style={styles.postCard}>
+      <View style={styles.postHeader}>
+        <Text style={styles.postTitle}>Activite recente</Text>
+        <Pressable onPress={() => router.push("/transactions")}>
+          <Text style={styles.postAction}>Voir tout</Text>
+        </Pressable>
+      </View>
+      {transactions.slice(0, 10).map((transaction) => (
+        <TransactionRow key={`${transaction.title}-${transaction.amount}`} transaction={transaction} />
+      ))}
+    </View>
+  );
+}
+
 function MonthlySpendingSection() {
   return (
     <View style={styles.postCard}>
@@ -491,19 +678,28 @@ function MonthlySpendingSection() {
 }
 
 function MonthlySpendingRechart() {
+  const [chartWidth, setChartWidth] = React.useState(0);
+
+  const handleLayout = React.useCallback((event: LayoutChangeEvent) => {
+    const nextWidth = Math.floor(event.nativeEvent.layout.width);
+    setChartWidth((currentWidth) => (currentWidth === nextWidth ? currentWidth : nextWidth));
+  }, []);
+
   return (
-    <View style={styles.webChart}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={monthlySpendingChartData} margin={{ bottom: 0, left: 0, right: 0, top: 10 }}>
-          <XAxis
-            dataKey="day"
-            axisLine={false}
-            tickLine={false}
-            tick={{ fill: "#6B7280", fontSize: 11, fontWeight: 700 }}
-          />
-          <Bar dataKey="amount" fill="#111827" radius={[999, 999, 999, 999]} />
-        </BarChart>
-      </ResponsiveContainer>
+    <View onLayout={handleLayout} style={styles.webChart}>
+      {chartWidth > 0 ? (
+        <ResponsiveContainer width={chartWidth} height="100%">
+          <BarChart data={monthlySpendingChartData} margin={{ bottom: 0, left: 0, right: 0, top: 10 }}>
+            <XAxis
+              dataKey="day"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: "#6B7280", fontSize: 11, fontWeight: 700 }}
+            />
+            <Bar dataKey="amount" fill="#111827" radius={[999, 999, 999, 999]} />
+          </BarChart>
+        </ResponsiveContainer>
+      ) : null}
     </View>
   );
 }
@@ -680,6 +876,15 @@ function RecentDocumentsSection() {
         </Pressable>
       ))}
     </View>
+  );
+}
+
+function AddWidgetButton() {
+  return (
+    <Pressable disabled style={[styles.addWidgetButton, styles.addWidgetButtonDisabled]}>
+      <MaterialIcons name="add-circle-outline" size={18} color="#111827" />
+      <Text style={styles.addWidgetButtonText}>Ajouter un widget</Text>
+    </Pressable>
   );
 }
 
@@ -1030,6 +1235,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 116,
   },
+  fixedHeader: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    left: 0,
+    zIndex: 30,
+    elevation: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    backgroundColor: "#F5F7FA",
+  },
   heroSection: {
     minHeight: 284,
     borderRadius: 32,
@@ -1038,7 +1254,7 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   headerBlock: {
-    marginBottom: 14,
+    marginBottom: 0,
   },
   header: {
     flexDirection: "row",
@@ -1251,6 +1467,20 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: "900",
   },
+  widgetSlot: {
+    marginBottom: 6,
+  },
+  widgetCardContainer: {
+    position: "relative",
+  },
+  widgetCardDragging: {
+    zIndex: 20,
+    elevation: 8,
+    shadowColor: "#111827",
+    shadowOpacity: 0.14,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 14 },
+  },
   postCard: {
     borderWidth: 1,
     borderColor: "#D1D5DB",
@@ -1386,6 +1616,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#111827",
   },
   webChart: {
+    minWidth: 0,
     height: 116,
     marginTop: 12,
   },
@@ -1484,6 +1715,29 @@ const styles = StyleSheet.create({
   promoDotActive: {
     width: 18,
     backgroundColor: "#111827",
+  },
+  addWidgetButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    minHeight: 54,
+    marginTop: 4,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 18,
+    borderStyle: "dashed",
+    backgroundColor: "#FFFFFF",
+  },
+  addWidgetButtonDisabled: {
+    opacity: 0.55,
+  },
+  addWidgetButtonText: {
+    color: "#111827",
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "800",
   },
 
   // Beneficiaries

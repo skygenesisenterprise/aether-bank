@@ -1,124 +1,49 @@
 import * as React from "react";
 
 import { MaterialIcons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import { router } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { ScreenTransition } from "@/components/mobile/screen-transition";
 import { usePhoneSafeAreaInsets } from "@/components/mobile/use-phone-safe-area";
+import { type PortfolioCardItem, portfolioCards } from "@/data/cards";
 
-type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
-
-// TODO: Connect card management API
-// TODO: Connect virtual cards endpoint
-// TODO: Connect card activity endpoint
-// TODO: Connect cashback service
-
-const cards = [
-  { name: "Carte Virtuelle", network: "Visa", last4: "4829", type: "Virtuelle", status: "Active", expires: "08/29", currency: "EUR", balance: "12 450.80 €" },
-  { name: "Carte Physique", network: "Visa", last4: "1094", type: "Physique", status: "Active", expires: "03/28", currency: "EUR", balance: "8 230.00 €" },
-  { name: "Carte Organisation", network: "Visa", last4: "7621", type: "Virtuelle", status: "Active", expires: "12/30", currency: "EUR", balance: "89 150.00 €" },
-];
-
-const quickActions: { icon: IconName; label: string }[] = [
-  { icon: "lock-outline", label: "Voir PIN" },
-  { icon: "ac-unit", label: "Geler" },
-  { icon: "phone-iphone", label: "Wallet" },
-  { icon: "settings", label: "Paramètres" },
-];
-
-const cardInfo: { label: string; value: string }[] = [
-  { label: "Statut", value: "Active" },
-  { label: "Type", value: "Virtuelle" },
-  { label: "Réseau", value: "Visa" },
-  { label: "Expiration", value: "08/29" },
-  { label: "Devise", value: "EUR" },
-];
-
-const monthlySummary = {
-  expenses: "1 245 €",
-  transactions: "32",
-  cashback: "24.80 €",
+const nearbyAtmCoordinates = {
+  latitude: 43.4862,
+  longitude: 5.2331,
 };
 
-// TODO: Connect virtual cards endpoint
-const virtualCards = [
-  { name: "Shopping", status: "Active", type: "Virtuelle" },
-  { name: "Abonnements", status: "Active", type: "Virtuelle" },
-  { name: "Temporaire", status: "Expirée", type: "Virtuelle" },
-];
+function getExpoMaps() {
+  if (Constants.appOwnership === "expo") {
+    return null;
+  }
 
-// TODO: Connect Apple Wallet integration
-// TODO: Connect Google Wallet integration
-const wallets = [
-  { name: "Apple Wallet", status: "Connecté" },
-  { name: "Google Wallet", status: "Non connecté" },
-];
-
-const securitySwitches = [
-  { label: "Paiement en ligne", enabled: true },
-  { label: "Paiement sans contact", enabled: true },
-  { label: "Paiement international", enabled: true },
-  { label: "Retraits ATM", enabled: true },
-];
-
-// TODO: Connect card activity endpoint
-const cardActivity = [
-  { title: "Netflix", amount: "-15.99 €", icon: "movie" as IconName },
-  { title: "Apple", amount: "-4.99 €", icon: "apple" as IconName },
-  { title: "Steam", amount: "-39.99 €", icon: "sports-esports" as IconName },
-  { title: "Monoprix", amount: "-92.30 €", icon: "shopping-bag" as IconName },
-];
-
-// TODO: Connect organizational cards endpoint
-const organizationalCards = [
-  { name: "SGE Europe", budget: "10 000 €", available: "8 450 €" },
-  { name: "Aether Office", budget: "3 000 €", available: "2 250 €" },
-];
-
-// TODO: Connect card analytics service
-const insights = [
-  "Votre carte la plus utilisée est la Carte Virtuelle.",
-  "Les abonnements représentent 12 % de vos dépenses.",
-  "Vous avez obtenu 24.80 € de cashback ce mois-ci.",
-];
-
-const infrastructure = [
-  { label: "Card Processor", status: "Operational" },
-  { label: "Apple Wallet", status: "Operational" },
-  { label: "Virtual Cards", status: "Operational" },
-  { label: "Notifications", status: "Operational" },
-];
-
-// TODO: Connect card security settings
-// TODO: Connect organizational cards endpoint
+  try {
+    return require("expo-maps") as typeof import("expo-maps");
+  } catch {
+    return null;
+  }
+}
 
 export default function CardsScreen() {
   const insets = usePhoneSafeAreaInsets();
-  const [activeIndex, setActiveIndex] = React.useState(0);
 
   return (
     <ScreenTransition direction="up">
       <View style={styles.safeArea}>
         <ScrollView
+          bounces={false}
           contentContainerStyle={[
             styles.content,
-            { paddingTop: insets.top + 6, paddingBottom: insets.bottom + 40 },
+            { paddingTop: insets.top + 6, paddingBottom: insets.bottom + 36 },
           ]}
           showsVerticalScrollIndicator={false}
         >
           <Header />
-          <HeroCarousel activeIndex={activeIndex} onIndexChange={setActiveIndex} />
-          <QuickActionsRow />
-          <CardInfoSection />
-          <FinancialSummary />
-          <VirtualCardsSection />
-          <WalletsSection />
-          <SecuritySection />
-          <CardActivitySection />
-          <OrganizationalCardsSection />
-          <InsightsCard />
-          <Footer />
+          <WalletSection />
+          <NearbyAtmCard />
+          <FooterCta />
         </ScrollView>
       </View>
     </ScreenTransition>
@@ -127,257 +52,215 @@ export default function CardsScreen() {
 
 function Header() {
   return (
-    <View style={styles.header}>
+    <View style={styles.headerBlock}>
       <Pressable style={styles.closeButton} onPress={() => router.back()}>
-        <MaterialIcons name="close" size={22} color="#FFFFFF" />
+        <MaterialIcons name="close" size={22} color="#111827" />
       </Pressable>
-      <Text style={styles.headerTitle}>Mes cartes</Text>
+      <Text style={styles.pageTitle}>Portefeuille</Text>
     </View>
   );
 }
 
-function HeroCarousel({ activeIndex, onIndexChange }: { activeIndex: number; onIndexChange: (i: number) => void }) {
-  const [cardWidth, setCardWidth] = React.useState(0);
-
+function WalletSection() {
   return (
-    <View
-      style={styles.heroOuter}
-      onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}
+    <View style={styles.walletCard}>
+      {portfolioCards.map((card, index) => (
+        <WalletRow key={card.id} card={card} isLast={index === portfolioCards.length - 1} />
+      ))}
+    </View>
+  );
+}
+
+function WalletRow({ card, isLast }: { card: PortfolioCardItem; isLast: boolean }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      android_ripple={{ color: "#E5E7EB" }}
+      onPress={() => {
+        router.push({
+          pathname: "/cards-detail",
+          params: { id: card.id },
+        });
+      }}
+      style={({ pressed }) => [
+        styles.walletRow,
+        !isLast && styles.walletRowSpacing,
+        pressed && styles.walletRowPressed,
+      ]}
     >
-      <ScrollView
-        horizontal
-        pagingEnabled
-        decelerationRate="fast"
-        showsHorizontalScrollIndicator={false}
-        snapToInterval={cardWidth || 320}
-        snapToAlignment="start"
-        onMomentumScrollEnd={(e) => {
-          const index = cardWidth > 0 ? Math.round(e.nativeEvent.contentOffset.x / cardWidth) : 0;
-          onIndexChange(index);
+      <CardPreview card={card} />
+      <View style={styles.walletCopy}>
+        <Text style={styles.walletTitle}>{card.title}</Text>
+        <Text
+          numberOfLines={card.compact ? 2 : 1}
+          style={[styles.walletSubtitle, card.compact && styles.walletSubtitleCompact]}
+        >
+          {card.subtitle}
+        </Text>
+      </View>
+
+      {card.currency ? (
+        <View style={styles.currencyBadge}>
+          <MaterialIcons name="link" size={12} color="#6B7280" />
+          <Text style={styles.currencyBadgeText}>{card.currency}</Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
+
+function CardPreview({ card }: { card: PortfolioCardItem }) {
+  return (
+    <View style={styles.cardPreview}>
+      <View style={styles.cardPreviewSheen} />
+      <View style={[styles.cardPreviewLine, styles.cardPreviewLineOne]} />
+      <View style={[styles.cardPreviewLine, styles.cardPreviewLineTwo]} />
+      <View style={[styles.cardPreviewLine, styles.cardPreviewLineThree]} />
+
+      <Text style={styles.cardPreviewBrand}>SGE</Text>
+      <View style={styles.cardPreviewChip}>
+        <View style={styles.cardPreviewChipCore} />
+      </View>
+      <MaterialIcons name="contactless" size={10} color="#A3A3A3" style={styles.cardPreviewContactless} />
+
+      {card.network === "visa" ? <Text style={styles.visaGlyph}>VISA</Text> : null}
+
+      {card.network === "mastercard" ? (
+        <View style={styles.mastercardGlyph}>
+          <View style={[styles.mastercardCircle, styles.mastercardCircleLeft]} />
+          <View style={[styles.mastercardCircle, styles.mastercardCircleRight]} />
+        </View>
+      ) : null}
+
+      {!card.network ? <Text style={styles.rpayGlyph}>RPay</Text> : null}
+    </View>
+  );
+}
+
+function NearbyAtmCard() {
+  return (
+    <Pressable style={styles.atmCard}>
+      <NearbyAtmMap />
+      <View style={styles.atmOverlay} />
+      <View style={styles.atmFooter}>
+        <Text style={styles.atmTitle}>Trouver des DAB à proximité</Text>
+        <MaterialIcons name="chevron-right" size={22} color="#111827" />
+      </View>
+    </Pressable>
+  );
+}
+
+function NearbyAtmMap() {
+  if (Platform.OS === "android") {
+    const mapsModule = getExpoMaps();
+    if (!mapsModule?.GoogleMaps) {
+      return <NearbyAtmMapFallback />;
+    }
+
+    const { GoogleMaps } = mapsModule;
+
+    return (
+      <GoogleMaps.View
+        style={styles.mapSurface}
+        cameraPosition={{
+          coordinates: nearbyAtmCoordinates,
+          zoom: 13.8,
         }}
-        style={{ overflow: "visible" }}
-      >
-        {cards.map((card, i) => (
-          <View key={card.last4} style={[styles.heroCard, { width: cardWidth || 320 }]}>
-            <View style={styles.heroCardInner}>
-              <Text style={styles.heroCardBank}>Aether Bank</Text>
-              <View style={styles.heroCardChipRow}>
-                <View style={styles.heroCardChip} />
-              </View>
-              <Text style={styles.heroCardNumber}>**** {card.last4}</Text>
-              <View style={styles.heroCardFooter}>
-                <View>
-                  <Text style={styles.heroCardStatus}>{card.status}</Text>
-                  <Text style={styles.heroCardMeta}>{card.name}</Text>
-                </View>
-                <Text style={styles.heroCardNetwork}>{card.network}</Text>
-              </View>
-            </View>
-          </View>
-        ))}
-      </ScrollView>
-      <View style={styles.carouselDots}>
-        {cards.map((_, i) => (
-          <View key={i} style={[styles.carouselDot, i === activeIndex && styles.carouselDotActive]} />
-        ))}
+        colorScheme={GoogleMaps.MapColorScheme.LIGHT}
+        markers={[
+          {
+            id: "nearby-atm",
+            coordinates: nearbyAtmCoordinates,
+            title: "Distributeur Aether",
+            snippet: "Rognac",
+            showCallout: true,
+          },
+        ]}
+        properties={{
+          mapType: GoogleMaps.MapType.NORMAL,
+        }}
+        uiSettings={{
+          compassEnabled: false,
+          indoorLevelPickerEnabled: false,
+          mapToolbarEnabled: false,
+          myLocationButtonEnabled: false,
+          rotationGesturesEnabled: false,
+          scrollGesturesEnabled: false,
+          tiltGesturesEnabled: false,
+          zoomControlsEnabled: false,
+          zoomGesturesEnabled: false,
+        }}
+      />
+    );
+  }
+
+  if (Platform.OS === "ios") {
+    const mapsModule = getExpoMaps();
+    if (!mapsModule?.AppleMaps) {
+      return <NearbyAtmMapFallback />;
+    }
+
+    const { AppleMaps } = mapsModule;
+
+    return (
+      <AppleMaps.View
+        style={styles.mapSurface}
+        cameraPosition={{
+          coordinates: nearbyAtmCoordinates,
+          zoom: 0.12,
+        }}
+        colorScheme={AppleMaps.MapColorScheme.LIGHT}
+        markers={[
+          {
+            id: "nearby-atm",
+            coordinates: nearbyAtmCoordinates,
+            title: "Distributeur Aether",
+            tintColor: "#111827",
+            systemImage: "building.columns.fill",
+          },
+        ]}
+        properties={{
+          mapType: AppleMaps.MapType.STANDARD,
+        }}
+        uiSettings={{
+          compassEnabled: false,
+          myLocationButtonEnabled: false,
+          scaleBarEnabled: false,
+          togglePitchEnabled: false,
+        }}
+      />
+    );
+  }
+
+  return <NearbyAtmMapFallback />;
+}
+
+function NearbyAtmMapFallback() {
+  return (
+    <View style={styles.mapSurface}>
+      <View style={styles.mapBackground} />
+      <View style={styles.mapRoadPrimary} />
+      <View style={styles.mapRoadSecondary} />
+      <View style={styles.mapRoadVertical} />
+      <View style={styles.mapRoutePill}>
+        <Text style={styles.mapRoutePillText}>E46</Text>
+      </View>
+      <Text style={styles.mapAreaLabel}>Rognac</Text>
+      <View style={styles.mapPin}>
+        <MaterialIcons name="account-balance" size={18} color="#FFFFFF" />
       </View>
     </View>
   );
 }
 
-function QuickActionsRow() {
+function FooterCta() {
   return (
-    <View style={styles.quickActionRow}>
-      {quickActions.map((action) => (
-        <Pressable key={action.label} style={styles.quickAction}>
-          <View style={styles.quickActionIcon}>
-            <MaterialIcons name={action.icon} size={20} color="#111827" />
-          </View>
-          <Text style={styles.quickActionText}>{action.label}</Text>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
-
-function CardInfoSection() {
-  return (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>Informations carte</Text>
-      <View style={styles.infoGrid}>
-        {cardInfo.map((row) => (
-          <View key={row.label} style={styles.infoRow}>
-            <Text style={styles.infoLabel}>{row.label}</Text>
-            <Text style={styles.infoValue}>{row.value}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-function FinancialSummary() {
-  return (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>Résumé carte</Text>
-      <View style={styles.summaryRow}>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryLabel}>Dépenses du mois</Text>
-          <Text style={styles.summaryValue}>{monthlySummary.expenses}</Text>
-        </View>
-        <View style={styles.summaryDivider} />
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryLabel}>Transactions</Text>
-          <Text style={styles.summaryValue}>{monthlySummary.transactions}</Text>
-        </View>
-        <View style={styles.summaryDivider} />
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryLabel}>Cashback</Text>
-          <Text style={styles.summaryValue}>{monthlySummary.cashback}</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function VirtualCardsSection() {
-  return (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>Cartes virtuelles</Text>
-      {virtualCards.map((vc, i) => (
-        <View key={vc.name} style={[styles.listRow, i < virtualCards.length - 1 && styles.listRowBorder]}>
-          <View style={styles.listRowLeading}>
-            <View style={styles.listIcon}>
-              <MaterialIcons name="credit-card" size={18} color="#111827" />
-            </View>
-            <Text style={styles.listLabel}>{vc.name}</Text>
-          </View>
-          <View style={styles.listStatusBadge}>
-            <Text style={[styles.listStatusText, vc.status === "Expirée" ? { color: "#BD2E2E" } : { color: "#1F8A4C" }]}>
-              {vc.status}
-            </Text>
-          </View>
-        </View>
-      ))}
-      <Pressable style={styles.createButton}>
-        <MaterialIcons name="add" size={18} color="#FFFFFF" />
-        <Text style={styles.createButtonText}>Créer une carte virtuelle</Text>
+    <View style={styles.footerBlock}>
+      <Text style={styles.footerHint}>Vous souhaitez remplacer une carte résiliée ?</Text>
+      <Pressable style={styles.addButton} onPress={() => router.push("/cards-create")}>
+        <MaterialIcons name="add" size={24} color="#FFFFFF" />
+        <Text style={styles.addButtonText}>Ajouter</Text>
       </Pressable>
-    </View>
-  );
-}
-
-function WalletsSection() {
-  return (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>Wallets</Text>
-      {wallets.map((wallet, i) => (
-        <View key={wallet.name} style={[styles.listRow, i < wallets.length - 1 && styles.listRowBorder]}>
-          <View style={styles.listRowLeading}>
-            <View style={styles.listIcon}>
-              <MaterialIcons name={wallet.name === "Apple Wallet" ? "phone-iphone" : "android"} size={18} color="#111827" />
-            </View>
-            <View>
-              <Text style={styles.listLabel}>{wallet.name}</Text>
-              <Text style={styles.listStatusCaption}>{wallet.status}</Text>
-            </View>
-          </View>
-          <Pressable style={styles.configureBadge}>
-            <Text style={styles.configureBadgeText}>Configurer</Text>
-          </Pressable>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function SecuritySection() {
-  const [switches, setSwitches] = React.useState(securitySwitches.map((s) => s.enabled));
-
-  const toggle = (i: number) => {
-    setSwitches((prev) => prev.map((v, j) => (j === i ? !v : v)));
-  };
-
-  return (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>Sécurité de la carte</Text>
-      {securitySwitches.map((item, i) => (
-        <Pressable key={item.label} style={styles.securityRow} onPress={() => toggle(i)}>
-          <Text style={styles.securityLabel}>{item.label}</Text>
-          <View style={[styles.switchTrack, switches[i] && styles.switchTrackActive]}>
-            <View style={[styles.switchThumb, switches[i] && styles.switchThumbActive]} />
-          </View>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
-
-function CardActivitySection() {
-  return (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>Activité carte</Text>
-      {cardActivity.map((item, i) => (
-        <View key={item.title} style={[styles.listRow, i < cardActivity.length - 1 && styles.listRowBorder]}>
-          <View style={styles.listRowLeading}>
-            <View style={styles.listIcon}>
-              <MaterialIcons name={item.icon} size={18} color="#111827" />
-            </View>
-            <Text style={styles.listLabel}>{item.title}</Text>
-          </View>
-          <Text style={styles.activityAmount}>{item.amount}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function OrganizationalCardsSection() {
-  return (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>Cartes organisationnelles</Text>
-      {organizationalCards.map((oc, i) => (
-        <View key={oc.name} style={[styles.orgCard, i < organizationalCards.length - 1 && styles.orgCardBorder]}>
-          <Text style={styles.orgName}>{oc.name}</Text>
-          <View style={styles.orgStats}>
-            <View style={styles.orgStat}>
-              <Text style={styles.orgStatLabel}>Budget</Text>
-              <Text style={styles.orgStatValue}>{oc.budget}</Text>
-            </View>
-            <View style={styles.orgStat}>
-              <Text style={styles.orgStatLabel}>Disponible</Text>
-              <Text style={[styles.orgStatValue, { color: "#1F8A4C" }]}>{oc.available}</Text>
-            </View>
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function InsightsCard() {
-  return (
-    <View style={styles.insightsCard}>
-      <View style={styles.insightsHeader}>
-        <MaterialIcons name="auto-awesome" size={20} color="#FFFFFF" />
-        <Text style={styles.insightsTitle}>Aether Insights</Text>
-      </View>
-      {insights.map((text, i) => (
-        <View key={i} style={styles.insightRow}>
-          <View style={styles.insightBullet} />
-          <Text style={styles.insightText}>{text}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function Footer() {
-  return (
-    <View style={styles.footer}>
-      <Text style={styles.footerTitle}>Aether Bank Cards</Text>
-      <Text style={styles.footerVersion}>Version 1.0.0</Text>
-      <Text style={styles.footerDisclaimer}>Données simulées</Text>
     </View>
   );
 }
@@ -390,10 +273,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 20,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
+  headerBlock: {
     marginBottom: 14,
   },
   closeButton: {
@@ -401,429 +281,318 @@ const styles = StyleSheet.create({
     height: 42,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 21,
-    backgroundColor: "#111827",
-  },
-  headerTitle: {
-    color: "#05070A",
-    fontSize: 20,
-    lineHeight: 25,
-    fontWeight: "900",
-  },
-  heroOuter: {
-    marginBottom: 4,
-    overflow: "visible",
-  },
-  heroCard: {
-    paddingHorizontal: 2,
-  },
-  heroCardInner: {
-    borderRadius: 22,
-    padding: 22,
-    backgroundColor: "#111827",
-    justifyContent: "space-between",
-    minHeight: 210,
-  },
-  heroCardBank: {
-    color: "rgba(255, 255, 255, 0.7)",
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: "800",
-    letterSpacing: 1,
-    textTransform: "uppercase",
-  },
-  heroCardChipRow: {
-    marginTop: 6,
-    marginBottom: 14,
-  },
-  heroCardChip: {
-    width: 38,
-    height: 28,
-    borderRadius: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
-  },
-  heroCardNumber: {
-    color: "#FFFFFF",
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: "700",
-    letterSpacing: 3,
-    marginBottom: 18,
-  },
-  heroCardFooter: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-  },
-  heroCardStatus: {
-    color: "#22C55E",
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: "900",
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  heroCardMeta: {
-    color: "rgba(255, 255, 255, 0.6)",
-    fontSize: 13,
-    lineHeight: 17,
-    fontWeight: "700",
-  },
-  heroCardNetwork: {
-    color: "rgba(255, 255, 255, 0.5)",
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: "900",
-    letterSpacing: 1,
-  },
-  carouselDots: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    marginTop: 14,
-    marginBottom: 8,
-  },
-  carouselDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: "#D1D5DB",
-  },
-  carouselDotActive: {
-    width: 18,
-    backgroundColor: "#111827",
-  },
-  quickActionRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 18,
-  },
-  quickAction: {
-    width: "23%",
-    alignItems: "center",
-    gap: 7,
-  },
-  quickActionIcon: {
-    width: 48,
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
     borderWidth: 1,
     borderColor: "#D1D5DB",
-    borderRadius: 24,
+    borderRadius: 22,
     backgroundColor: "#FFFFFF",
-    shadowColor: "#111827",
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
   },
-  quickActionText: {
-    color: "#374151",
-    textAlign: "center",
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: "800",
+  pageTitle: {
+    color: "#05070A",
+    fontSize: 32,
+    lineHeight: 36,
+    fontWeight: "900",
+    marginTop: 14,
   },
-  card: {
+  walletCard: {
     borderWidth: 1,
     borderColor: "#D1D5DB",
     borderRadius: 18,
-    padding: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     marginBottom: 14,
     backgroundColor: "#FFFFFF",
   },
-  cardTitle: {
-    color: "#05070A",
-    fontSize: 16,
-    lineHeight: 21,
+  walletRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 46,
+  },
+  walletRowPressed: {
+    opacity: 0.72,
+  },
+  walletRowSpacing: {
+    marginBottom: 8,
+  },
+  cardPreview: {
+    width: 50,
+    height: 30,
+    borderWidth: 1,
+    borderColor: "#3F3F46",
+    borderRadius: 5,
+    marginRight: 12,
+    overflow: "hidden",
+    backgroundColor: "#0D0D0D",
+  },
+  cardPreviewSheen: {
+    position: "absolute",
+    top: -8,
+    right: 0,
+    width: 34,
+    height: 44,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    transform: [{ rotate: "24deg" }],
+  },
+  cardPreviewLine: {
+    position: "absolute",
+    right: -9,
+    width: 48,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    transform: [{ rotate: "-18deg" }],
+  },
+  cardPreviewLineOne: {
+    top: 7,
+  },
+  cardPreviewLineTwo: {
+    top: 13,
+    opacity: 0.8,
+  },
+  cardPreviewLineThree: {
+    top: 19,
+    opacity: 0.5,
+  },
+  cardPreviewBrand: {
+    position: "absolute",
+    top: 4,
+    left: 5,
+    color: "#FFFFFF",
+    fontSize: 5,
+    lineHeight: 6,
     fontWeight: "900",
-    marginBottom: 12,
+    letterSpacing: 1,
   },
-  infoGrid: {
-    gap: 10,
-  },
-  infoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  infoLabel: {
-    color: "#6B7280",
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: "700",
-  },
-  infoValue: {
-    color: "#111827",
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: "900",
-  },
-  summaryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  summaryItem: {
-    flex: 1,
-    alignItems: "center",
-    gap: 4,
-  },
-  summaryDivider: {
-    width: 1,
-    height: 32,
-    backgroundColor: "#D1D5DB",
-  },
-  summaryLabel: {
-    color: "#6B7280",
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: "800",
-    textAlign: "center",
-  },
-  summaryValue: {
-    color: "#05070A",
-    fontSize: 18,
-    lineHeight: 23,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-  listRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 11,
-  },
-  listRowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-  },
-  listRowLeading: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1,
-  },
-  listIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+  cardPreviewChip: {
+    position: "absolute",
+    left: 7,
+    top: 13,
+    width: 12,
+    height: 9,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F3F4F6",
+    borderRadius: 2,
+    backgroundColor: "#C7C7C7",
   },
-  listLabel: {
-    color: "#111827",
+  cardPreviewChipCore: {
+    width: 6,
+    height: 6,
+    borderRadius: 2,
+    borderWidth: 1,
+    borderColor: "#8A8A8A",
+  },
+  cardPreviewContactless: {
+    position: "absolute",
+    left: 22,
+    top: 13,
+  },
+  mastercardGlyph: {
+    position: "absolute",
+    right: 5,
+    bottom: 5,
+    width: 18,
+    height: 10,
+  },
+  mastercardCircle: {
+    position: "absolute",
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  mastercardCircleLeft: {
+    left: 0,
+    backgroundColor: "#F59E0B",
+  },
+  mastercardCircleRight: {
+    right: 0,
+    backgroundColor: "#EF4444",
+    opacity: 0.95,
+  },
+  visaGlyph: {
+    position: "absolute",
+    right: 5,
+    bottom: 4,
+    color: "#FFFFFF",
+    fontSize: 7,
+    lineHeight: 8,
+    fontWeight: "900",
+  },
+  rpayGlyph: {
+    position: "absolute",
+    right: 5,
+    bottom: 4,
+    color: "#FFFFFF",
+    fontSize: 6,
+    lineHeight: 8,
+    fontWeight: "900",
+  },
+  walletCopy: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 10,
+  },
+  walletTitle: {
+    color: "#05070A",
     fontSize: 14,
     lineHeight: 18,
-    fontWeight: "800",
+    fontWeight: "900",
   },
-  listStatusCaption: {
+  walletSubtitle: {
     color: "#6B7280",
     fontSize: 12,
-    lineHeight: 16,
+    lineHeight: 15,
     fontWeight: "600",
     marginTop: 1,
   },
-  listStatusBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  walletSubtitleCompact: {
+    maxWidth: 230,
+  },
+  currencyBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    flexShrink: 0,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 14,
     backgroundColor: "#F3F4F6",
   },
-  listStatusText: {
-    fontSize: 12,
-    lineHeight: 15,
+  currencyBadgeText: {
+    color: "#374151",
+    fontSize: 11,
+    lineHeight: 13,
     fontWeight: "800",
   },
-  createButton: {
+  atmCard: {
+    height: 176,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 24,
+    overflow: "hidden",
+    marginBottom: 18,
+    backgroundColor: "#E9EEF5",
+  },
+  mapSurface: {
+    flex: 1,
+  },
+  mapBackground: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#E6EDF6",
+  },
+  mapRoadPrimary: {
+    position: "absolute",
+    top: 40,
+    left: -20,
+    width: 430,
+    height: 4,
+    backgroundColor: "#A7F3D0",
+    transform: [{ rotate: "-8deg" }],
+    opacity: 0.95,
+  },
+  mapRoadSecondary: {
+    position: "absolute",
+    bottom: 62,
+    left: -10,
+    width: 300,
+    height: 3,
+    backgroundColor: "#93C5FD",
+    transform: [{ rotate: "10deg" }],
+    opacity: 0.8,
+  },
+  mapRoadVertical: {
+    position: "absolute",
+    top: 18,
+    right: 92,
+    width: 3,
+    height: 120,
+    backgroundColor: "#93C5FD",
+    transform: [{ rotate: "18deg" }],
+    opacity: 0.7,
+  },
+  mapRoutePill: {
+    position: "absolute",
+    top: 13,
+    right: 18,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: "#22C55E",
+  },
+  mapRoutePillText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: "900",
+  },
+  mapAreaLabel: {
+    position: "absolute",
+    top: 22,
+    left: 76,
+    color: "#4B5563",
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: "800",
+  },
+  mapPin: {
+    position: "absolute",
+    top: 66,
+    left: "46%",
+    width: 30,
+    height: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 15,
+    backgroundColor: "#111827",
+  },
+  atmOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 82,
+    backgroundColor: "rgba(255,255,255,0.82)",
+  },
+  atmFooter: {
+    position: "absolute",
+    right: 16,
+    bottom: 14,
+    left: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  atmTitle: {
+    color: "#05070A",
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: "900",
+  },
+  footerBlock: {
+    alignItems: "center",
+  },
+  footerHint: {
+    color: "#6B7280",
+    textAlign: "center",
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: "600",
+    marginBottom: 12,
+  },
+  addButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    borderRadius: 999,
-    paddingVertical: 12,
-    marginTop: 6,
-    backgroundColor: "#111827",
-  },
-  createButtonText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    lineHeight: 17,
-    fontWeight: "900",
-  },
-  configureBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: "#111827",
-  },
-  configureBadgeText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    lineHeight: 15,
-    fontWeight: "900",
-  },
-  securityRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 10,
-  },
-  securityLabel: {
-    color: "#111827",
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: "800",
-  },
-  switchTrack: {
-    width: 44,
-    height: 26,
-    borderRadius: 13,
-    padding: 3,
-    backgroundColor: "#D1D5DB",
-  },
-  switchTrackActive: {
-    backgroundColor: "#111827",
-  },
-  switchThumb: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#FFFFFF",
-  },
-  switchThumbActive: {
-    alignSelf: "flex-end",
-  },
-  activityAmount: {
-    color: "#111827",
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: "900",
-  },
-  orgCard: {
-    paddingVertical: 12,
-  },
-  orgCardBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-  },
-  orgName: {
-    color: "#05070A",
-    fontSize: 15,
-    lineHeight: 19,
-    fontWeight: "900",
-    marginBottom: 10,
-  },
-  orgStats: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 24,
-  },
-  orgStat: {
-    gap: 2,
-  },
-  orgStatLabel: {
-    color: "#6B7280",
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: "800",
-  },
-  orgStatValue: {
-    color: "#05070A",
-    fontSize: 16,
-    lineHeight: 21,
-    fontWeight: "900",
-  },
-  insightsCard: {
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 14,
-    backgroundColor: "#087BEA",
-  },
-  insightsHeader: {
-    flexDirection: "row",
-    alignItems: "center",
     gap: 8,
-    marginBottom: 14,
+    minWidth: 132,
+    height: 52,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: "#111827",
+    borderRadius: 26,
+    backgroundColor: "#111827",
   },
-  insightsTitle: {
+  addButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
-    lineHeight: 21,
-    fontWeight: "900",
-  },
-  insightRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-    marginBottom: 8,
-  },
-  insightBullet: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginTop: 5,
-    backgroundColor: "rgba(255, 255, 255, 0.5)",
-  },
-  insightText: {
-    flex: 1,
-    color: "#D8EBFF",
-    fontSize: 14,
-    lineHeight: 19,
-    fontWeight: "600",
-  },
-  infraRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-  },
-  infraLabel: {
-    color: "#111827",
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: "700",
-  },
-  infraStatus: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  infraDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#22C55E",
-  },
-  infraStatusText: {
-    color: "#1F8A4C",
-    fontSize: 13,
-    lineHeight: 17,
+    fontSize: 17,
+    lineHeight: 20,
     fontWeight: "800",
-  },
-  footer: {
-    alignItems: "center",
-    paddingBottom: 8,
-    gap: 4,
-  },
-  footerTitle: {
-    color: "#6B7280",
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: "800",
-  },
-  footerVersion: {
-    color: "#6B7280",
-    fontSize: 13,
-    lineHeight: 17,
-    fontWeight: "600",
-  },
-  footerDisclaimer: {
-    color: "#9CA3AF",
-    fontSize: 11,
-    lineHeight: 15,
-    fontWeight: "600",
-    marginTop: 2,
   },
 });
