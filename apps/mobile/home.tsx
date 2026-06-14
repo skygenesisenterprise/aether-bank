@@ -2,27 +2,22 @@ import * as React from "react";
 
 import { MaterialIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { Alert, LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, KeyboardAvoidingView, LayoutChangeEvent, Modal, NativeScrollEvent, NativeSyntheticEvent, Platform, Pressable, RefreshControl, ScrollView, StyleProp, StyleSheet, Text, TextInput, TextStyle, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { Bar, BarChart, ResponsiveContainer, XAxis } from "recharts";
 
 import { ScreenTransition } from "@/components/mobile/screen-transition";
+import { useTabScrollToTop } from "@/components/mobile/tab-scroll-to-top";
 import { usePhoneSafeAreaInsets } from "@/components/mobile/use-phone-safe-area";
 import { usePortal } from "@/components/mobile/portal-provider";
+import { getTransactionsForAccount, prependTransactionsForAccounts } from "@/data/account-transactions";
 import { type HomeWidgetConfig, type HomeWidgetId, defaultHomeWidgets } from "@/data/home-widgets";
-import { type Transaction, categoryConfig, transactions } from "@/data/transactions";
+import { type Transaction, categoryConfig } from "@/data/transactions";
 import { type Account, accounts } from "@/data/accounts";
 
 type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
 
 type QuickActionType = "add" | "betweenAccounts" | "qrPay" | "more";
-
-const destinationAccounts = [
-  { label: "Vault Infrastructure", balance: "€284,500.00", meta: "Coffre" },
-  { label: "Collaborateur SGE", balance: "€12,400.00", meta: "SGE" },
-  { label: "Aether Office", balance: "€67,200.00", meta: "Professionnel" },
-  { label: "SGE Europe", balance: "€143,800.00", meta: "SGE" },
-];
 
 const topUpMethods = [
   { title: "Recharger par virement SEPA", description: "Recevez de l'argent via vos coordonnées bancaires.", icon: "account-balance" as const, route: "/account-sepa" as const },
@@ -57,105 +52,29 @@ interface BankCard {
   status: string;
   last4: string;
   icon: IconName;
+  meta: string;
 }
 
 interface HomeWidgetDefinition {
-  Component: React.ComponentType;
+  Component: React.ComponentType<HomeWidgetSectionProps>;
+}
+
+interface HomeWidgetSectionProps {
+  activeAccount: Account;
 }
 
 const quickActions: QuickAction[] = [
   { title: "Ajouter de l'argent", icon: "add", action: "add" },
   { title: "Entre mes comptes", icon: "shuffle", action: "betweenAccounts" },
-  { title: "Payer QR", icon: "qr-code-scanner", action: "qrPay" },
+  { title: "QR Code", icon: "qr-code-scanner", action: "qrPay" },
   { title: "Plus", icon: "more-horiz", action: "more" },
-];
-
-
-
-
-
-// TODO: Connect SGE API monthly spending summary
-const monthlySummary = {
-  expenses: "1 245 €",
-  income: "8 500 €",
-};
-
-const monthlySpendingBars = [38, 62, 44, 78, 52, 34, 68];
-
-const monthlySpendingChartData = [
-  { day: "L", amount: 380 },
-  { day: "M", amount: 620 },
-  { day: "M", amount: 440 },
-  { day: "J", amount: 780 },
-  { day: "V", amount: 520 },
-  { day: "S", amount: 340 },
-  { day: "D", amount: 680 },
-];
-
-interface Promotion {
-  title: string;
-  description: string;
-  action: string;
-  icon: IconName;
-  // TODO: Connect SGE API / notification service
-}
-
-// TODO: Connect SGE API promotions / notification service
-const promotions: Promotion[] = [
-  {
-    title: "Aether Metal",
-    description: "Profitez de vos avantages premium : cashback, cartes virtuelles et support prioritaire.",
-    action: "Découvrir",
-    icon: "diamond",
-  },
-  {
-    title: "Aether Identity",
-    description: "Activez Face ID pour sécuriser vos paiements.",
-    action: "Configurer",
-    icon: "fingerprint",
-  },
-  {
-    title: "Wero",
-    description: "Envoyez de l'argent instantanément en Europe.",
-    action: "Essayer",
-    icon: "send",
-  },
-  {
-    title: "Carte virtuelle",
-    description: "Créez une carte temporaire pour vos achats en ligne.",
-    action: "Créer",
-    icon: "credit-card",
-  },
-];
-
-// TODO: Connect SGE API card list
-const bankCards: BankCard[] = [
-  {
-    title: "Carte Virtuelle Aether Bank",
-    status: "Active",
-    last4: "4829",
-    icon: "credit-card",
-  },
-  {
-    title: "Carte Physique Aether Black",
-    status: "Active",
-    last4: "1094",
-    icon: "style",
-  },
 ];
 
 interface Beneficiary {
   name: string;
   initials: string;
+  accountHint: string;
 }
-
-const frequentBeneficiaries: Beneficiary[] = [
-  { name: "Sophie D.", initials: "SD" },
-  { name: "Thomas M.", initials: "TM" },
-  { name: "Aether Off.", initials: "AO" },
-  { name: "SGE Europe", initials: "SE" },
-  { name: "Vault Infra", initials: "VI" },
-];
 
 interface CategorySpending {
   label: string;
@@ -163,14 +82,6 @@ interface CategorySpending {
   percentage: number;
   icon: IconName;
 }
-
-const categorySpending: CategorySpending[] = [
-  { label: "Alimentation", amount: "312 €", percentage: 38, icon: "restaurant" },
-  { label: "Transport", amount: "187 €", percentage: 22, icon: "directions-car" },
-  { label: "Abonnements", amount: "95 €", percentage: 15, icon: "subscriptions" },
-  { label: "Loisirs", amount: "74 €", percentage: 12, icon: "sports-esports" },
-  { label: "Autres", amount: "86 €", percentage: 13, icon: "more-horiz" },
-];
 
 interface ScheduledTransfer {
   title: string;
@@ -201,13 +112,215 @@ interface RecentDocument {
   title: string;
   date: string;
   icon: IconName;
+  meta: string;
 }
 
-const recentDocuments: RecentDocument[] = [
-  { title: "Relevé mai 2026", date: "2 juin 2026", icon: "description" },
-  { title: "RIB - Personnel", date: "15 mai 2026", icon: "receipt" },
-  { title: "Attestation de compte", date: "3 mai 2026", icon: "verified" },
-];
+interface MonthlySpendingPoint {
+  day: string;
+  amount: number;
+}
+
+interface AccountHomeContent {
+  monthlySummary: {
+    expenses: string;
+    income: string;
+    periodLabel: string;
+  };
+  monthlySpendingBars: number[];
+  monthlySpendingChartData: MonthlySpendingPoint[];
+  bankCards: BankCard[];
+  frequentBeneficiaries: Beneficiary[];
+  categorySpending: CategorySpending[];
+  scheduledTransfers: ScheduledTransfer[];
+  savingGoals: SavingGoal[];
+  recentDocuments: RecentDocument[];
+}
+
+const accountHomeContent: Record<Account["id"], AccountHomeContent> = {
+  "aether-salary": {
+    monthlySummary: {
+      expenses: "1 245 €",
+      income: "8 500 €",
+      periodLabel: "Cycle personnel",
+    },
+    monthlySpendingBars: [38, 62, 44, 78, 52, 34, 68],
+    monthlySpendingChartData: [
+      { day: "L", amount: 380 },
+      { day: "M", amount: 620 },
+      { day: "M", amount: 440 },
+      { day: "J", amount: 780 },
+      { day: "V", amount: 520 },
+      { day: "S", amount: 340 },
+      { day: "D", amount: 680 },
+    ],
+    bankCards: [
+      { title: "Carte Virtuelle Aether Bank", status: "Active", last4: "4829", icon: "credit-card", meta: "Abonnements et e-commerce" },
+      { title: "Carte Physique Aether Black", status: "Active", last4: "1094", icon: "style", meta: "Paiements quotidiens" },
+    ],
+    frequentBeneficiaries: [
+      { name: "Sophie D.", initials: "SD", accountHint: "Compte joint" },
+      { name: "Thomas M.", initials: "TM", accountHint: "Remboursements" },
+      { name: "Aether Off.", initials: "AO", accountHint: "Virement interne" },
+      { name: "SGE Europe", initials: "SE", accountHint: "Salaire" },
+      { name: "Vault Infra", initials: "VI", accountHint: "Epargne" },
+    ],
+    categorySpending: [
+      { label: "Alimentation", amount: "312 €", percentage: 38, icon: "restaurant" },
+      { label: "Transport", amount: "187 €", percentage: 22, icon: "directions-car" },
+      { label: "Abonnements", amount: "95 €", percentage: 15, icon: "subscriptions" },
+      { label: "Loisirs", amount: "74 €", percentage: 12, icon: "sports-esports" },
+      { label: "Autres", amount: "86 €", percentage: 13, icon: "more-horiz" },
+    ],
+    scheduledTransfers,
+    savingGoals,
+    recentDocuments: [
+      { title: "Releve mai 2026", date: "2 juin 2026", icon: "description", meta: "Compte Personnel · PDF" },
+      { title: "RIB - Personnel", date: "15 mai 2026", icon: "receipt", meta: "IBAN partageable" },
+      { title: "Attestation de compte", date: "3 mai 2026", icon: "verified", meta: "Verification KYC" },
+    ],
+  },
+  joint: {
+    monthlySummary: {
+      expenses: "2 890 €",
+      income: "4 600 €",
+      periodLabel: "Budget du foyer",
+    },
+    monthlySpendingBars: [46, 71, 52, 80, 64, 58, 49],
+    monthlySpendingChartData: [
+      { day: "L", amount: 520 },
+      { day: "M", amount: 810 },
+      { day: "M", amount: 640 },
+      { day: "J", amount: 920 },
+      { day: "V", amount: 760 },
+      { day: "S", amount: 690 },
+      { day: "D", amount: 540 },
+    ],
+    bankCards: [
+      { title: "Carte commune Liam", status: "Active", last4: "6721", icon: "credit-card", meta: "Plafond mensuel 4 500 €" },
+      { title: "Carte commune Sophie", status: "Active", last4: "1183", icon: "style", meta: "Apple Pay active" },
+    ],
+    frequentBeneficiaries: [
+      { name: "Bailleur Paris", initials: "BP", accountHint: "Loyer" },
+      { name: "EDF", initials: "ED", accountHint: "Energie" },
+      { name: "Crèche Mila", initials: "CM", accountHint: "Famille" },
+      { name: "Sophie D.", initials: "SD", accountHint: "Titulaire joint" },
+    ],
+    categorySpending: [
+      { label: "Logement", amount: "1 242 €", percentage: 42, icon: "apartment" },
+      { label: "Courses", amount: "618 €", percentage: 22, icon: "restaurant" },
+      { label: "Factures", amount: "395 €", percentage: 14, icon: "receipt-long" },
+      { label: "Transport", amount: "219 €", percentage: 12, icon: "directions-car" },
+      { label: "Autres", amount: "416 €", percentage: 10, icon: "more-horiz" },
+    ],
+    scheduledTransfers: [
+      { title: "Loyer", date: "28 juin 2026", amount: "-1 200,00 €", icon: "home" },
+      { title: "Epargne foyer", date: "30 juin 2026", amount: "-400,00 €", icon: "savings" },
+      { title: "Crèche", date: "5 juillet 2026", amount: "-520,00 €", icon: "child-care" },
+    ],
+    savingGoals: [
+      { title: "Vacances famille", current: 3200, target: 5000, icon: "flight" },
+      { title: "Travaux cuisine", current: 1800, target: 8000, icon: "construction" },
+    ],
+    recentDocuments: [
+      { title: "Releve compte joint", date: "3 juin 2026", icon: "description", meta: "Compte Joint · PDF" },
+      { title: "Mandat de prelevement", date: "28 mai 2026", icon: "assignment", meta: "Loyer principal" },
+      { title: "Justificatif de domicile", date: "20 mai 2026", icon: "home-work", meta: "Titulaire joint" },
+    ],
+  },
+  epargne: {
+    monthlySummary: {
+      expenses: "540 €",
+      income: "2 200 €",
+      periodLabel: "Allocation d'epargne",
+    },
+    monthlySpendingBars: [18, 12, 26, 20, 31, 22, 28],
+    monthlySpendingChartData: [
+      { day: "L", amount: 120 },
+      { day: "M", amount: 85 },
+      { day: "M", amount: 160 },
+      { day: "J", amount: 110 },
+      { day: "V", amount: 220 },
+      { day: "S", amount: 150 },
+      { day: "D", amount: 175 },
+    ],
+    bankCards: [],
+    frequentBeneficiaries: [
+      { name: "IBKR", initials: "IB", accountHint: "Investissement" },
+      { name: "Vault Infra", initials: "VI", accountHint: "Coffre" },
+      { name: "Compte Personnel", initials: "PE", accountHint: "Source reguliere" },
+    ],
+    categorySpending: [
+      { label: "Investissement", amount: "500 €", percentage: 57, icon: "show-chart" },
+      { label: "Frais de garde", amount: "120 €", percentage: 15, icon: "account-balance" },
+      { label: "Fiscalite", amount: "84 €", percentage: 10, icon: "receipt-long" },
+      { label: "Transferts", amount: "176 €", percentage: 18, icon: "swap-horiz" },
+    ],
+    scheduledTransfers: [
+      { title: "Versement automatique", date: "1 juillet 2026", amount: "+500,00 €", icon: "calendar-month" },
+      { title: "Depot portefeuille titres", date: "4 juillet 2026", amount: "-500,00 €", icon: "show-chart" },
+    ],
+    savingGoals: [
+      { title: "Fonds d'urgence", current: 4000, target: 6000, icon: "health-and-safety" },
+      { title: "Apport immobilier", current: 12200, target: 30000, icon: "apartment" },
+    ],
+    recentDocuments: [
+      { title: "Releve d'epargne", date: "2 juin 2026", icon: "description", meta: "Rendement 2.5%" },
+      { title: "Synthese performance", date: "31 mai 2026", icon: "insights", meta: "Performance mensuelle" },
+    ],
+  },
+  "sge-operations": {
+    monthlySummary: {
+      expenses: "12 480 €",
+      income: "34 900 €",
+      periodLabel: "Operations SGE Belgium",
+    },
+    monthlySpendingBars: [54, 74, 62, 88, 71, 65, 81],
+    monthlySpendingChartData: [
+      { day: "L", amount: 2200 },
+      { day: "M", amount: 3400 },
+      { day: "M", amount: 2800 },
+      { day: "J", amount: 4100 },
+      { day: "V", amount: 3600 },
+      { day: "S", amount: 2400 },
+      { day: "D", amount: 2950 },
+    ],
+    bankCards: [
+      { title: "Carte operationnelle SGE", status: "Active", last4: "5521", icon: "credit-card", meta: "Equipe operations · plafond 15 000 €" },
+      { title: "Carte fournisseurs", status: "Sous surveillance", last4: "8842", icon: "admin-panel-settings", meta: "Validation renforcée active" },
+    ],
+    frequentBeneficiaries: [
+      { name: "URSSAF", initials: "UR", accountHint: "Charges sociales" },
+      { name: "AWS Europe", initials: "AW", accountHint: "Cloud" },
+      { name: "WeWork", initials: "WW", accountHint: "Locaux" },
+      { name: "Cabinet Legal", initials: "CL", accountHint: "Juridique" },
+    ],
+    categorySpending: [
+      { label: "Prestations", amount: "8 920 €", percentage: 35, icon: "code" },
+      { label: "Paie", amount: "6 820 €", percentage: 28, icon: "groups" },
+      { label: "Infrastructure", amount: "2 460 €", percentage: 17, icon: "cloud" },
+      { label: "Locaux", amount: "1 420 €", percentage: 11, icon: "business" },
+      { label: "Autres", amount: "1 860 €", percentage: 9, icon: "more-horiz" },
+    ],
+    scheduledTransfers: [
+      { title: "TVA reservee", date: "20 juin 2026", amount: "-2 150,00 €", icon: "receipt-long" },
+      { title: "Prestataire finance", date: "24 juin 2026", amount: "-3 200,00 €", icon: "payments" },
+      { title: "Dotation coffre", date: "30 juin 2026", amount: "-8 500,00 €", icon: "account-balance" },
+    ],
+    savingGoals: [
+      { title: "Tresorerie 90 jours", current: 42100, target: 65000, icon: "shield" },
+      { title: "Expansion produit", current: 11800, target: 25000, icon: "rocket-launch" },
+    ],
+    recentDocuments: [
+      { title: "Releve pro juin", date: "14 juin 2026", icon: "description", meta: "SGE Belgium · PDF" },
+      { title: "Export TVA", date: "13 juin 2026", icon: "table-chart", meta: "Preparation comptable" },
+      { title: "Justificatif de virement AWS", date: "12 juin 2026", icon: "verified", meta: "Fournisseur critique" },
+    ],
+  },
+};
+
+function getAccountHomeContent(account: Account) {
+  return accountHomeContent[account.id] ?? accountHomeContent["aether-salary"];
+}
 
 const homeWidgetRegistry: Record<HomeWidgetId, HomeWidgetDefinition> = {
   activity: { Component: ActivitySection },
@@ -221,9 +334,72 @@ const homeWidgetRegistry: Record<HomeWidgetId, HomeWidgetDefinition> = {
 };
 
 const HOME_HEADER_HEIGHT = 62;
+const amountFormatter = new Intl.NumberFormat("fr-FR", {
+  style: "currency",
+  currency: "EUR",
+  minimumFractionDigits: 2,
+});
+
+function parseMoneyToMinor(value: string): number {
+  const normalized = value
+    .replace(/[^\d,.-]/g, "")
+    .replace(/,/g, "");
+  const parsed = Number.parseFloat(normalized);
+
+  return Number.isFinite(parsed) ? Math.round(parsed * 100) : 0;
+}
+
+function parseAmountInputToMinor(value: string): number {
+  const normalized = value.replace(",", ".").replace(/[^\d.-]/g, "");
+  const parsed = Number.parseFloat(normalized);
+
+  return Number.isFinite(parsed) ? Math.round(parsed * 100) : 0;
+}
+
+function formatMinorToMoney(value: number): string {
+  const formatted = amountFormatter.format(value / 100).replace(/\u202f/g, " ").replace(/\u00a0/g, " ");
+  const numericValue = formatted.replace(/\s?€$/, "");
+
+  return `€${numericValue}`;
+}
+
+function formatMinorToTransactionAmount(value: number, tone: Transaction["tone"]): string {
+  const sign = tone === "credit" ? "+" : "-";
+  const amount = Math.abs(value / 100).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+  return `${sign}${amount} €`;
+}
+
+function accountIconFor(account: Account): IconName {
+  if (account.type === "Épargne") {
+    return "savings";
+  }
+
+  if (account.type === "Professionnel") {
+    return "business";
+  }
+
+  if (account.type === "Joint") {
+    return "group";
+  }
+
+  return "account-balance";
+}
+
+function AnimatedBalanceText({ value, style }: { value: string; style: StyleProp<TextStyle> }) {
+  return (
+    <Animated.Text key={value} entering={FadeIn.duration(260)} style={style}>
+      {value}
+    </Animated.Text>
+  );
+}
 
 export default function HomeScreen() {
   const insets = usePhoneSafeAreaInsets();
+  const scrollRef = React.useRef<ScrollView>(null);
   const params = useLocalSearchParams<{ widgetOrder?: string; accountOrder?: string; updatedAt?: string }>();
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [activeQuickAction, setActiveQuickAction] = React.useState<QuickActionType | null>(null);
@@ -232,6 +408,13 @@ export default function HomeScreen() {
   const [homeAccounts, setHomeAccounts] = React.useState(accounts);
   const portal = usePortal();
   const lastHandledUpdatedAtRef = React.useRef<string | null>(null);
+  const homeAccountsRef = React.useRef(homeAccounts);
+
+  React.useEffect(() => {
+    homeAccountsRef.current = homeAccounts;
+  }, [homeAccounts]);
+
+  useTabScrollToTop("home", scrollRef);
 
   React.useEffect(() => {
     const widgetOrder = params.widgetOrder;
@@ -284,26 +467,95 @@ export default function HomeScreen() {
     setTimeout(() => setRefreshing(false), 800);
   }, []);
   const activeAccount = homeAccounts[activeIndex] ?? homeAccounts[0];
+  const activeAccountRef = React.useRef(activeAccount);
+
+  React.useEffect(() => {
+    activeAccountRef.current = activeAccount;
+  }, [activeAccount]);
+
+  const handleInternalTransfer = React.useCallback((sourceAccountId: string, destinationAccountId: string, amountMinor: number) => {
+    const currentHomeAccounts = homeAccountsRef.current;
+    const sourceAccount = currentHomeAccounts.find((currentAccount) => currentAccount.id === sourceAccountId);
+    const destinationAccount = currentHomeAccounts.find((currentAccount) => currentAccount.id === destinationAccountId);
+    const nowLabel = "À l'instant";
+
+    if (sourceAccount && destinationAccount) {
+      prependTransactionsForAccounts(
+        sourceAccount.id,
+        destinationAccount.id,
+        {
+          title: destinationAccount.label,
+          description: `${nowLabel} · Transfert interne vers ${destinationAccount.label}`,
+          amount: formatMinorToTransactionAmount(amountMinor, "debit"),
+          tone: "debit",
+          icon: "swap-horiz",
+          category: "transfer",
+        },
+        {
+          title: sourceAccount.label,
+          description: `${nowLabel} · Transfert interne depuis ${sourceAccount.label}`,
+          amount: formatMinorToTransactionAmount(amountMinor, "credit"),
+          tone: "credit",
+          icon: "swap-horiz",
+          category: "transfer",
+        }
+      );
+    }
+
+    setHomeAccounts((currentAccounts) =>
+      currentAccounts.map((currentAccount) => {
+        const currentBalance = parseMoneyToMinor(currentAccount.balance);
+
+        if (currentAccount.id === sourceAccountId) {
+          return {
+            ...currentAccount,
+            balance: formatMinorToMoney(currentBalance - amountMinor),
+            lastSync: "À l'instant",
+          };
+        }
+
+        if (currentAccount.id === destinationAccountId) {
+          return {
+            ...currentAccount,
+            balance: formatMinorToMoney(currentBalance + amountMinor),
+            lastSync: "À l'instant",
+          };
+        }
+
+        return currentAccount;
+      })
+    );
+  }, []);
 
   const handleCloseQuickAction = React.useCallback(() => {
     setActiveQuickAction(null);
   }, []);
 
   React.useEffect(() => {
+    const panelAccount = activeAccountRef.current;
+    const panelAccounts = homeAccountsRef.current;
+
     switch (activeQuickAction) {
       case "add":
-        portal.setPortalContent(<AddMoneyPanel account={activeAccount} onClose={handleCloseQuickAction} />);
+        portal.setPortalContent(<AddMoneyPanel account={panelAccount} onClose={handleCloseQuickAction} />);
         break;
       case "betweenAccounts":
-        portal.setPortalContent(<BetweenAccountsPanel account={activeAccount} onClose={handleCloseQuickAction} />);
+        portal.setPortalContent(
+          <BetweenAccountsPanel
+            account={panelAccount}
+            accounts={panelAccounts}
+            onClose={handleCloseQuickAction}
+            onTransfer={handleInternalTransfer}
+          />
+        );
         break;
       case "more":
-        portal.setPortalContent(<MoreOptionsPanel account={activeAccount} onClose={handleCloseQuickAction} />);
+        portal.setPortalContent(<MoreOptionsPanel account={panelAccount} onClose={handleCloseQuickAction} />);
         break;
       default:
         portal.setPortalContent(null);
     }
-  }, [activeQuickAction, portal, handleCloseQuickAction, activeAccount]);
+  }, [activeQuickAction, portal, handleCloseQuickAction, activeAccount.id, handleInternalTransfer]);
 
   return (
     <ScreenTransition>
@@ -313,6 +565,7 @@ export default function HomeScreen() {
         </View>
 
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[styles.content, { paddingTop: insets.top + 6 + HOME_HEADER_HEIGHT }]}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6B7280" colors={["#6B7280"]} />}
@@ -331,7 +584,12 @@ export default function HomeScreen() {
                 action={action}
                 onPress={() => {
                   if (action.action === "qrPay") {
-                    router.push("/qr-scan");
+                    router.push({
+                      pathname: "/qr-scan",
+                      params: {
+                        accountId: activeAccount.id,
+                      },
+                    });
                     return;
                   }
 
@@ -341,15 +599,13 @@ export default function HomeScreen() {
             ))}
           </View>
 
-          <PromotionSection />
-
           {homeWidgets
             .filter((widget) => widget.enabled)
             .map((widget) => {
               const widgetDefinition = homeWidgetRegistry[widget.id];
               return (
                 <View key={widget.id} style={styles.widgetSlot}>
-                  <widgetDefinition.Component />
+                  <widgetDefinition.Component activeAccount={activeAccount} />
                 </View>
               );
             })}
@@ -401,12 +657,12 @@ function HeroSection({
           >
             {accounts.map((account) => (
               <Pressable
-                key={account.type}
+                key={account.id}
                 style={[styles.heroAccountContent, { width: cardWidth }]}
                 onPress={() => router.push(`/account-detail?id=${encodeURIComponent(account.id)}`)}
               >
                 <Text style={styles.heroAccountType}>{account.label}</Text>
-                <Text style={styles.heroAccountAmount}>{account.balance}</Text>
+                <AnimatedBalanceText value={account.balance} style={styles.heroAccountAmount} />
                 <Text style={styles.heroAccountMeta}>{account.meta}</Text>
                 <Pressable
                   style={styles.walletButton}
@@ -474,60 +730,6 @@ function HomeHeader() {
   );
 }
 
-function PromotionSection() {
-  const [activeIndex, setActiveIndex] = React.useState(0);
-  const [cardWidth, setCardWidth] = React.useState(0);
-
-  const handleLayout = (e: LayoutChangeEvent) => {
-    setCardWidth(e.nativeEvent.layout.width);
-  };
-
-  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const index = cardWidth > 0 ? Math.round(e.nativeEvent.contentOffset.x / cardWidth) : 0;
-    setActiveIndex(index);
-  };
-
-  return (
-    <View style={styles.promoSection}>
-      <View style={styles.promoCarousel} onLayout={handleLayout}>
-        {cardWidth > 0 && (
-          <>
-            <ScrollView
-              horizontal
-              pagingEnabled
-              decelerationRate="fast"
-              showsHorizontalScrollIndicator={false}
-              snapToInterval={cardWidth}
-              snapToAlignment="start"
-              onMomentumScrollEnd={handleScroll}
-              style={{ height: 150 }}
-            >
-              {promotions.map((promo) => (
-                <View key={promo.title} style={[styles.promoCard, { width: cardWidth }]}>
-                  <View style={styles.promoCardHeader}>
-                    <View style={styles.promoIcon}>
-                      <MaterialIcons name={promo.icon} size={18} color="#111827" />
-                    </View>
-                    <Text style={styles.promoTitle}>{promo.title}</Text>
-                  </View>
-                  <Text style={styles.promoDescription}>{promo.description}</Text>
-                  <Pressable style={styles.promoButton}>
-                    <Text style={styles.promoButtonText}>{promo.action}</Text>
-                  </Pressable>
-                </View>
-              ))}
-            </ScrollView>
-            <View style={styles.promoDots}>
-              {promotions.map((_, i) => (
-                <View key={i} style={[styles.promoDot, i === activeIndex && styles.promoDotActive]} />
-              ))}
-            </View>
-          </>
-        )}
-      </View>
-    </View>
-  );
-}
 
 function QuickActionButton({ action, onPress }: { action: QuickAction; onPress: () => void }) {
   return (
@@ -540,10 +742,30 @@ function QuickActionButton({ action, onPress }: { action: QuickAction; onPress: 
   );
 }
 
-function TransactionRow({ transaction }: { transaction: Transaction }) {
+function TransactionRow({
+  accountId,
+  transaction,
+  transactionIndex,
+}: {
+  accountId?: string;
+  transaction: Transaction;
+  transactionIndex?: number;
+}) {
   const cat = categoryConfig[transaction.category];
   return (
-    <Pressable style={styles.transactionRow} onPress={() => router.push(`/transaction-detail?title=${encodeURIComponent(transaction.title)}`)}>
+    <Pressable
+      style={styles.transactionRow}
+      onPress={() =>
+        router.push({
+          pathname: "/transaction-detail",
+          params: {
+            title: transaction.title,
+            accountId,
+            transactionIndex: transactionIndex !== undefined ? String(transactionIndex) : undefined,
+          },
+        })
+      }
+    >
       <View style={[styles.transactionIcon, { backgroundColor: cat.bgColor }]}>
         <MaterialIcons name={transaction.icon} size={20} color={cat.color} />
       </View>
@@ -561,23 +783,41 @@ function TransactionRow({ transaction }: { transaction: Transaction }) {
   );
 }
 
-function ActivitySection() {
+function ActivitySection({ activeAccount }: HomeWidgetSectionProps) {
+  const accountTransactions = getTransactionsForAccount(activeAccount.id);
+
   return (
     <View style={styles.postCard}>
       <View style={styles.postHeader}>
         <Text style={styles.postTitle}>Activite recente</Text>
-        <Pressable onPress={() => router.push("/transactions")}>
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: "/transactions",
+              params: {
+                accountId: activeAccount.id,
+              },
+            })
+          }
+        >
           <Text style={styles.postAction}>Voir tout</Text>
         </Pressable>
       </View>
-      {transactions.slice(0, 4).map((transaction) => (
-        <TransactionRow key={`${transaction.title}-${transaction.amount}`} transaction={transaction} />
+      {accountTransactions.slice(0, 4).map((transaction, index) => (
+        <TransactionRow
+          key={`${transaction.title}-${transaction.amount}`}
+          accountId={activeAccount.id}
+          transaction={transaction}
+          transactionIndex={index}
+        />
       ))}
     </View>
   );
 }
 
-function MonthlySpendingSection() {
+function MonthlySpendingSection({ activeAccount }: HomeWidgetSectionProps) {
+  const homeContent = getAccountHomeContent(activeAccount);
+
   return (
     <View style={styles.postCard}>
       <View style={styles.postHeader}>
@@ -587,21 +827,26 @@ function MonthlySpendingSection() {
         <View style={styles.chartHeader}>
           <View>
             <Text style={styles.chartLabel}>Depenses</Text>
-            <Text style={styles.chartValue}>{monthlySummary.expenses}</Text>
+            <Text style={styles.chartValue}>{homeContent.monthlySummary.expenses}</Text>
           </View>
           <View style={styles.chartIncomeBlock}>
             <Text style={styles.chartLabel}>Revenus</Text>
-            <Text style={styles.chartIncomeValue}>{monthlySummary.income}</Text>
+            <Text style={styles.chartIncomeValue}>{homeContent.monthlySummary.income}</Text>
           </View>
         </View>
+        <Text style={styles.chartPeriodLabel}>{homeContent.monthlySummary.periodLabel}</Text>
 
-        {Platform.OS === "web" ? <MonthlySpendingRechart /> : <MonthlySpendingNativeChart />}
+        {Platform.OS === "web" ? (
+          <MonthlySpendingRechart data={homeContent.monthlySpendingChartData} />
+        ) : (
+          <MonthlySpendingNativeChart bars={homeContent.monthlySpendingBars} />
+        )}
       </View>
     </View>
   );
 }
 
-function MonthlySpendingRechart() {
+function MonthlySpendingRechart({ data }: { data: MonthlySpendingPoint[] }) {
   const [chartWidth, setChartWidth] = React.useState(0);
 
   const handleLayout = React.useCallback((event: LayoutChangeEvent) => {
@@ -613,7 +858,7 @@ function MonthlySpendingRechart() {
     <View onLayout={handleLayout} style={styles.webChart}>
       {chartWidth > 0 ? (
         <ResponsiveContainer width={chartWidth} height="100%">
-          <BarChart data={monthlySpendingChartData} margin={{ bottom: 0, left: 0, right: 0, top: 10 }}>
+          <BarChart data={data} margin={{ bottom: 0, left: 0, right: 0, top: 10 }}>
             <XAxis
               dataKey="day"
               axisLine={false}
@@ -628,10 +873,10 @@ function MonthlySpendingRechart() {
   );
 }
 
-function MonthlySpendingNativeChart() {
+function MonthlySpendingNativeChart({ bars }: { bars: number[] }) {
   return (
     <View style={styles.barChart}>
-      {monthlySpendingBars.map((height, index) => (
+      {bars.map((height, index) => (
         <View key={`${height}-${index}`} style={styles.barColumn}>
           <View style={[styles.barFill, { height }]} />
         </View>
@@ -640,7 +885,9 @@ function MonthlySpendingNativeChart() {
   );
 }
 
-function CardsSection() {
+function CardsSection({ activeAccount }: HomeWidgetSectionProps) {
+  const homeContent = getAccountHomeContent(activeAccount);
+
   return (
     <View style={styles.postCard}>
       <View style={styles.postHeader}>
@@ -649,9 +896,17 @@ function CardsSection() {
           <Text style={styles.postAction}>Voir tout</Text>
         </Pressable>
       </View>
-      {bankCards.map((card) => (
-        <CardRow key={card.last4} card={card} />
-      ))}
+      {homeContent.bankCards.length > 0 ? (
+        homeContent.bankCards.map((card) => (
+          <CardRow key={card.last4} card={card} />
+        ))
+      ) : (
+        <SectionPlaceholder
+          icon="credit-card-off"
+          title="Aucune carte rattachee"
+          description="Ce compte est principalement alimente par virements internes et ne dispose pas de carte active."
+        />
+      )}
     </View>
   );
 }
@@ -664,14 +919,16 @@ function CardRow({ card }: { card: BankCard }) {
       </View>
       <View style={styles.transactionCopy}>
         <Text style={styles.transactionTitle}>{card.title}</Text>
-        <Text style={styles.transactionDescription}>{card.status}</Text>
+        <Text style={styles.transactionDescription}>{card.status} · {card.meta}</Text>
       </View>
       <Text style={styles.cardLast4}>**** {card.last4}</Text>
     </Pressable>
   );
 }
 
-function FrequentBeneficiariesSection() {
+function FrequentBeneficiariesSection({ activeAccount }: HomeWidgetSectionProps) {
+  const homeContent = getAccountHomeContent(activeAccount);
+
   return (
     <View style={styles.postCard}>
       <View style={styles.postHeader}>
@@ -681,12 +938,13 @@ function FrequentBeneficiariesSection() {
         </Pressable>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.beneficiaryScroll}>
-        {frequentBeneficiaries.map((b) => (
+        {homeContent.frequentBeneficiaries.map((b) => (
           <Pressable key={b.name} style={styles.beneficiaryItem}>
             <View style={styles.beneficiaryAvatar}>
               <Text style={styles.beneficiaryInitials}>{b.initials}</Text>
             </View>
             <Text style={styles.beneficiaryName}>{b.name}</Text>
+            <Text style={styles.beneficiaryHint}>{b.accountHint}</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -694,13 +952,15 @@ function FrequentBeneficiariesSection() {
   );
 }
 
-function CategorySpendingSection() {
+function CategorySpendingSection({ activeAccount }: HomeWidgetSectionProps) {
+  const homeContent = getAccountHomeContent(activeAccount);
+
   return (
     <View style={styles.postCard}>
       <View style={styles.postHeader}>
         <Text style={styles.postTitle}>Depenses par categorie</Text>
       </View>
-      {categorySpending.map((cat) => (
+      {homeContent.categorySpending.map((cat) => (
         <View key={cat.label} style={styles.categoryRow}>
           <View style={styles.categoryIcon}>
             <MaterialIcons name={cat.icon} size={16} color="#111827" />
@@ -718,7 +978,9 @@ function CategorySpendingSection() {
   );
 }
 
-function ScheduledTransfersSection() {
+function ScheduledTransfersSection({ activeAccount }: HomeWidgetSectionProps) {
+  const homeContent = getAccountHomeContent(activeAccount);
+
   return (
     <View style={styles.postCard}>
       <View style={styles.postHeader}>
@@ -727,23 +989,33 @@ function ScheduledTransfersSection() {
           <Text style={styles.postAction}>Voir tout</Text>
         </Pressable>
       </View>
-      {scheduledTransfers.map((t) => (
-        <View key={t.title} style={styles.categoryRow}>
-          <View style={styles.categoryIcon}>
-            <MaterialIcons name={t.icon} size={16} color="#111827" />
+      {homeContent.scheduledTransfers.length > 0 ? (
+        homeContent.scheduledTransfers.map((t) => (
+          <View key={t.title} style={styles.categoryRow}>
+            <View style={styles.categoryIcon}>
+              <MaterialIcons name={t.icon} size={16} color="#111827" />
+            </View>
+            <View style={styles.categoryCopy}>
+              <Text style={styles.categoryLabel}>{t.title}</Text>
+              <Text style={styles.transferDate}>{t.date}</Text>
+            </View>
+            <Text style={styles.debitAmount}>{t.amount}</Text>
           </View>
-          <View style={styles.categoryCopy}>
-            <Text style={styles.categoryLabel}>{t.title}</Text>
-            <Text style={styles.transferDate}>{t.date}</Text>
-          </View>
-          <Text style={styles.debitAmount}>{t.amount}</Text>
-        </View>
-      ))}
+        ))
+      ) : (
+        <SectionPlaceholder
+          icon="event-busy"
+          title="Aucun virement programme"
+          description="Aucune instruction recurrente n'est definie pour ce compte."
+        />
+      )}
     </View>
   );
 }
 
-function SavingGoalsSection() {
+function SavingGoalsSection({ activeAccount }: HomeWidgetSectionProps) {
+  const homeContent = getAccountHomeContent(activeAccount);
+
   return (
     <View style={styles.postCard}>
       <View style={styles.postHeader}>
@@ -752,7 +1024,7 @@ function SavingGoalsSection() {
           <Text style={styles.postAction}>Ajouter</Text>
         </Pressable>
       </View>
-      {savingGoals.map((goal) => {
+      {homeContent.savingGoals.map((goal) => {
         const progress = Math.round((goal.current / goal.target) * 100);
         return (
           <View key={goal.title} style={styles.goalCard}>
@@ -778,7 +1050,9 @@ function SavingGoalsSection() {
   );
 }
 
-function RecentDocumentsSection() {
+function RecentDocumentsSection({ activeAccount }: HomeWidgetSectionProps) {
+  const homeContent = getAccountHomeContent(activeAccount);
+
   return (
     <View style={styles.postCard}>
       <View style={styles.postHeader}>
@@ -787,18 +1061,40 @@ function RecentDocumentsSection() {
           <Text style={styles.postAction}>Voir tout</Text>
         </Pressable>
       </View>
-      {recentDocuments.map((doc) => (
+      {homeContent.recentDocuments.map((doc) => (
         <Pressable key={doc.title} style={styles.categoryRow}>
           <View style={styles.categoryIcon}>
             <MaterialIcons name={doc.icon} size={16} color="#111827" />
           </View>
           <View style={styles.categoryCopy}>
             <Text style={styles.categoryLabel}>{doc.title}</Text>
-            <Text style={styles.transferDate}>{doc.date}</Text>
+            <Text style={styles.transferDate}>{doc.date} · {doc.meta}</Text>
           </View>
           <MaterialIcons name="file-download" size={18} color="#6B7280" />
         </Pressable>
       ))}
+    </View>
+  );
+}
+
+function SectionPlaceholder({
+  description,
+  icon,
+  title,
+}: {
+  description: string;
+  icon: IconName;
+  title: string;
+}) {
+  return (
+    <View style={styles.sectionPlaceholder}>
+      <View style={styles.sectionPlaceholderIcon}>
+        <MaterialIcons name={icon} size={18} color="#6B7280" />
+      </View>
+      <View style={styles.sectionPlaceholderCopy}>
+        <Text style={styles.sectionPlaceholderTitle}>{title}</Text>
+        <Text style={styles.sectionPlaceholderText}>{description}</Text>
+      </View>
     </View>
   );
 }
@@ -827,22 +1123,59 @@ function BottomSheet({ onClose, title, children }: { onClose: () => void; title:
     onClose();
   }, [onClose]);
 
-  return (
+  const sheetBody = (
+    <>
+      <View style={styles.bottomSheetHandle} />
+      <View style={styles.bottomSheetHeader}>
+        <Text style={styles.bottomSheetTitle}>{title}</Text>
+        <Pressable onPress={handleClose} style={styles.bottomSheetCloseButton}>
+          <MaterialIcons name="close" size={22} color="#6B7280" />
+        </Pressable>
+      </View>
+      <ScrollView
+        style={styles.bottomSheetScroll}
+        contentContainerStyle={styles.bottomSheetScrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {children}
+      </ScrollView>
+    </>
+  );
+
+  if (Platform.OS === "web") {
+    return (
+      <Animated.View entering={FadeIn.duration(200)} style={styles.bottomSheetOverlayWeb} pointerEvents="box-none">
+        <KeyboardAvoidingView style={styles.bottomSheetKeyboardView}>
+          <View style={[styles.bottomSheetContainer, styles.bottomSheetContainerWeb]}>
+            {sheetBody}
+          </View>
+          <Pressable style={styles.bottomSheetBackdropWeb} onPress={handleClose} />
+        </KeyboardAvoidingView>
+      </Animated.View>
+    );
+  }
+
+  const sheetContent = (
     <Animated.View entering={FadeIn.duration(200)} style={styles.bottomSheetOverlay} pointerEvents="box-none">
       <Pressable style={styles.bottomSheetBackdrop} onPress={handleClose} />
-      <View style={styles.bottomSheetContainer}>
-        <View style={styles.bottomSheetHandle} />
-        <View style={styles.bottomSheetHeader}>
-          <Text style={styles.bottomSheetTitle}>{title}</Text>
-          <Pressable onPress={handleClose} style={styles.bottomSheetCloseButton}>
-            <MaterialIcons name="close" size={22} color="#6B7280" />
-          </Pressable>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 18 : 0}
+        style={styles.bottomSheetKeyboardView}
+      >
+        <View style={styles.bottomSheetContainer}>
+          {sheetBody}
         </View>
-        <ScrollView style={styles.bottomSheetScroll} showsVerticalScrollIndicator={false} bounces={false}>
-          {children}
-        </ScrollView>
-      </View>
+      </KeyboardAvoidingView>
     </Animated.View>
+  );
+
+  return (
+    <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={handleClose}>
+      {sheetContent}
+    </Modal>
   );
 }
 
@@ -918,26 +1251,58 @@ function AddMoneyPanel({ account, onClose }: { account: Account; onClose: () => 
   );
 }
 
-function BetweenAccountsPanel({ account, onClose }: { account: Account; onClose: () => void }) {
+function BetweenAccountsPanel({
+  account,
+  accounts,
+  onClose,
+  onTransfer,
+}: {
+  account: Account;
+  accounts: Account[];
+  onClose: () => void;
+  onTransfer: (sourceAccountId: string, destinationAccountId: string, amountMinor: number) => void;
+}) {
   const [selectedDest, setSelectedDest] = React.useState(0);
-  const [amount, setAmount] = React.useState("500.00");
+  const [amount, setAmount] = React.useState("");
   const [transferSuccess, setTransferSuccess] = React.useState(false);
+  const [confirmedDestinationLabel, setConfirmedDestinationLabel] = React.useState("");
+  const hasAmount = amount.trim().length > 0;
 
-  const contextualDestinations = React.useMemo(() => {
-    const otherAccounts = accounts.filter((a) => a.type !== account.type);
-    return [
-      ...destinationAccounts,
-      ...otherAccounts.map((a) => ({
-        label: a.label,
-        balance: a.balance,
-        meta: a.meta,
-      })),
-    ];
-  }, [account.type]);
+  const contextualDestinations = React.useMemo(
+    () => accounts.filter((currentAccount) => currentAccount.id !== account.id),
+    [account.id, accounts]
+  );
+
+  React.useEffect(() => {
+    if (selectedDest >= contextualDestinations.length) {
+      setSelectedDest(0);
+    }
+  }, [contextualDestinations.length, selectedDest]);
 
   const handleTransfer = React.useCallback(() => {
+    const destination = contextualDestinations[selectedDest];
+    const amountMinor = parseAmountInputToMinor(amount);
+    const sourceBalanceMinor = parseMoneyToMinor(account.balance);
+
+    if (!destination) {
+      Alert.alert("Transfert indisponible", "Aucun autre compte n'est disponible pour ce transfert.");
+      return;
+    }
+
+    if (amountMinor <= 0) {
+      Alert.alert("Montant invalide", "Saisissez un montant supérieur à 0 €.");
+      return;
+    }
+
+    if (amountMinor > sourceBalanceMinor) {
+      Alert.alert("Solde insuffisant", `Le solde disponible sur ${account.label} est de ${account.balance}.`);
+      return;
+    }
+
+    onTransfer(account.id, destination.id, amountMinor);
+    setConfirmedDestinationLabel(destination.label);
     setTransferSuccess(true);
-  }, []);
+  }, [account.balance, account.id, account.label, amount, contextualDestinations, onTransfer, selectedDest]);
 
   if (transferSuccess) {
     return (
@@ -948,10 +1313,10 @@ function BetweenAccountsPanel({ account, onClose }: { account: Account; onClose:
           </View>
           <Text style={styles.successTitle}>Transfert simulé avec succès</Text>
           <Text style={styles.successDescription}>
-            {amount} € ont été transférés vers {contextualDestinations[selectedDest].label}.
+            {formatMinorToMoney(parseAmountInputToMinor(amount))} ont été transférés vers {confirmedDestinationLabel}.
           </Text>
           <Text style={styles.successLedgerNote}>
-            Les transferts internes sont synchronisés avec Aether Ledger.
+            Les soldes des comptes concernés ont été mis à jour automatiquement.
           </Text>
           <Pressable style={styles.successButton} onPress={onClose}>
             <Text style={styles.successButtonText}>Fermer</Text>
@@ -971,33 +1336,40 @@ function BetweenAccountsPanel({ account, onClose }: { account: Account; onClose:
         <Text style={styles.transferLabel}>Compte source</Text>
         <View style={styles.sourceAccountCard}>
           <View style={styles.sourceAccountIcon}>
-            <MaterialIcons name="account-balance" size={20} color="#111827" />
+            <MaterialIcons name={accountIconFor(account)} size={20} color="#111827" />
           </View>
           <View style={styles.sourceAccountCopy}>
             <Text style={styles.sourceAccountLabel}>{account.label}</Text>
-            <Text style={styles.sourceAccountBalance}>{account.balance} disponible</Text>
+            <View style={styles.balanceLine}>
+              <AnimatedBalanceText value={account.balance} style={styles.sourceAccountBalanceValue} />
+              <Text style={styles.sourceAccountBalance}> disponible</Text>
+            </View>
           </View>
         </View>
       </View>
 
       <View style={styles.transferSection}>
         <Text style={styles.transferLabel}>Compte destination</Text>
-        {contextualDestinations.map((dest, index) => (
+        {contextualDestinations.length === 0 ? (
+          <View style={styles.emptyDestAccountCard}>
+            <MaterialIcons name="info-outline" size={18} color="#6B7280" />
+            <Text style={styles.emptyDestAccountText}>Aucun autre compte Aether disponible.</Text>
+          </View>
+        ) : contextualDestinations.map((dest, index) => (
           <Pressable
-            key={dest.label}
+            key={dest.id}
             style={[styles.destAccountCard, selectedDest === index && styles.destAccountCardSelected]}
             onPress={() => setSelectedDest(index)}
           >
             <View style={styles.destAccountIcon}>
-              <MaterialIcons
-                name={dest.meta === "Coffre" ? "lock" : dest.meta === "SGE" ? "business" : "workspaces"}
-                size={18}
-                color="#111827"
-              />
+              <MaterialIcons name={accountIconFor(dest)} size={18} color="#111827" />
             </View>
             <View style={styles.destAccountCopy}>
               <Text style={styles.destAccountLabel}>{dest.label}</Text>
-              <Text style={styles.destAccountMeta}>{dest.balance} · {dest.meta}</Text>
+              <View style={styles.balanceLine}>
+                <AnimatedBalanceText value={dest.balance} style={styles.destAccountBalanceValue} />
+                <Text style={styles.destAccountMeta}> · {dest.meta}</Text>
+              </View>
             </View>
             {selectedDest === index && (
               <MaterialIcons name="check-circle" size={20} color="#1F8A4C" />
@@ -1009,12 +1381,15 @@ function BetweenAccountsPanel({ account, onClose }: { account: Account; onClose:
       <View style={styles.transferSection}>
         <Text style={styles.transferLabel}>Montant</Text>
         <View style={styles.amountInputRow}>
-          <Text style={styles.amountCurrency}>€</Text>
+          {hasAmount && <Text style={styles.amountCurrency}>€</Text>}
           <TextInput
             style={styles.amountInput}
             value={amount}
             onChangeText={setAmount}
-            keyboardType="numeric"
+            keyboardType="decimal-pad"
+            inputMode="decimal"
+            selectTextOnFocus
+            placeholder=""
             placeholderTextColor="#6B7280"
           />
         </View>
@@ -1027,13 +1402,7 @@ function BetweenAccountsPanel({ account, onClose }: { account: Account; onClose:
       <View style={styles.transferInfoCard}>
         <MaterialIcons name="info-outline" size={16} color="#6B7280" />
         <Text style={styles.transferInfoText}>
-          Les transferts internes sont synchronisés avec Aether Ledger.
-        </Text>
-      </View>
-
-      <View style={styles.bottomSheetFooter}>
-        <Text style={styles.bottomSheetFooterText}>
-          TODO: Connect internal transfer endpoint. Connect Aether Ledger transaction creation. Connect financial permissions. Connect biometric confirmation for internal transfers.
+          Ce transfert utilise uniquement les comptes chargés sur votre accueil. Les soldes source et destination se synchronisent immédiatement dans cette session.
         </Text>
       </View>
     </BottomSheet>
@@ -1335,6 +1704,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     gap: 6,
+    minWidth: 0,
+    paddingHorizontal: 2,
   },
   quickActionIcon: {
     width: 48,
@@ -1356,6 +1727,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     lineHeight: 14,
     fontWeight: "900",
+    flexShrink: 1,
   },
   identityCard: {
     flexDirection: "row",
@@ -1433,6 +1805,39 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: "900",
   },
+  accountContextRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+    paddingTop: 12,
+    marginTop: 6,
+  },
+  accountContextBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#F3F4F6",
+  },
+  accountContextText: {
+    color: "#111827",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "900",
+  },
+  accountContextMeta: {
+    flex: 1,
+    color: "#6B7280",
+    textAlign: "right",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "700",
+  },
   transactionRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1503,6 +1908,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     fontWeight: "800",
+  },
+  chartPeriodLabel: {
+    color: "#9CA3AF",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "700",
+    marginTop: 8,
+    marginBottom: 6,
   },
   chartValue: {
     color: "#05070A",
@@ -1696,6 +2109,14 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlign: "center",
   },
+  beneficiaryHint: {
+    color: "#9CA3AF",
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: "700",
+    textAlign: "center",
+    marginTop: 3,
+  },
 
   // Category Spending / Scheduled Transfers shared row
   categoryRow: {
@@ -1748,6 +2169,39 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginTop: 1,
   },
+  sectionPlaceholder: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+    paddingTop: 14,
+    marginTop: 8,
+  },
+  sectionPlaceholderIcon: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+  },
+  sectionPlaceholderCopy: {
+    flex: 1,
+  },
+  sectionPlaceholderTitle: {
+    color: "#111827",
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: "800",
+  },
+  sectionPlaceholderText: {
+    color: "#6B7280",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "600",
+    marginTop: 2,
+  },
 
   // Saving Goals
   goalCard: {
@@ -1795,10 +2249,32 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: "flex-end",
     backgroundColor: "rgba(0, 0, 0, 0.4)",
-    zIndex: 100,
+    zIndex: 1000,
+    elevation: 1000,
+  },
+  bottomSheetOverlayWeb: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "flex-start",
+    overflow: "hidden",
+    borderBottomLeftRadius: 44,
+    borderBottomRightRadius: 44,
+    zIndex: 1000,
+    elevation: 1000,
   },
   bottomSheetBackdrop: {
     flex: 1,
+  },
+  bottomSheetBackdropWeb: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.16)",
+  },
+  bottomSheetKeyboardView: {
+    flex: 1,
+    width: "100%",
   },
   bottomSheetContainer: {
     maxHeight: "85%",
@@ -1807,7 +2283,17 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     paddingHorizontal: 24,
     paddingTop: 8,
-    paddingBottom: 34,
+    paddingBottom: 14,
+  },
+  bottomSheetContainerWeb: {
+    height: "50%",
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: "hidden",
+    paddingTop: 16,
+    paddingBottom: 20,
   },
   bottomSheetHandle: {
     width: 36,
@@ -1839,6 +2325,9 @@ const styles = StyleSheet.create({
   },
   bottomSheetScroll: {
     flexGrow: 0,
+  },
+  bottomSheetScrollContent: {
+    paddingBottom: 0,
   },
   bottomSheetSubtitle: {
     color: "#6B7280",
@@ -1989,18 +2478,29 @@ const styles = StyleSheet.create({
   sourceAccountCopy: {
     flex: 1,
   },
+  balanceLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    marginTop: 2,
+  },
   sourceAccountLabel: {
     color: "#05070A",
     fontSize: 15,
     lineHeight: 20,
     fontWeight: "900",
   },
+  sourceAccountBalanceValue: {
+    color: "#6B7280",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "800",
+  },
   sourceAccountBalance: {
     color: "#6B7280",
     fontSize: 12,
     lineHeight: 16,
     fontWeight: "600",
-    marginTop: 2,
   },
   destAccountCard: {
     flexDirection: "row",
@@ -2039,7 +2539,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     fontWeight: "600",
-    marginTop: 1,
+  },
+  destAccountBalanceValue: {
+    color: "#6B7280",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "800",
+  },
+  emptyDestAccountCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 14,
+    padding: 13,
+    backgroundColor: "#F9FAFB",
+  },
+  emptyDestAccountText: {
+    flex: 1,
+    color: "#6B7280",
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "700",
   },
   amountInputRow: {
     flexDirection: "row",
@@ -2060,12 +2582,13 @@ const styles = StyleSheet.create({
   },
   amountInput: {
     flex: 1,
+    minWidth: 0,
     color: "#05070A",
     fontSize: 24,
     lineHeight: 30,
     fontWeight: "900",
     padding: 0,
-    textAlign: "right",
+    textAlign: "left",
   },
   transferButton: {
     borderRadius: 999,

@@ -9,7 +9,9 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 import "@/styles/globals.css";
 
 import { MobileAuthProvider, useMobileAuth } from "@/components/mobile/mobile-auth-provider";
-import { PortalProvider } from "@/components/mobile/portal-provider";
+import { PaymentAuthorizationListener } from "@/components/mobile/payment-authorization-listener";
+import { PortalProvider, usePortal } from "@/components/mobile/portal-provider";
+import { emitTabScrollToTop } from "@/components/mobile/tab-scroll-to-top";
 import { Colors } from "@/constants/theme";
 
 interface TabIconProps {
@@ -59,6 +61,7 @@ function MobileLayoutTabs() {
   const scheme = useColorScheme();
   const theme = Colors[scheme === "dark" ? "dark" : "light"];
   const { isAuthenticated, isHydrating, isLocked } = useMobileAuth();
+  const { hasPortalContent } = usePortal();
 
   const isPublicRoute = pathname === "/" || pathname === "/login" || pathname === "/register" || pathname === "/unlock";
 
@@ -95,6 +98,7 @@ function MobileLayoutTabs() {
           marginBottom: 4,
         },
         tabBarStyle: {
+          display: hasPortalContent ? "none" : "flex",
           position: "absolute",
           left: 0,
           right: 0,
@@ -118,6 +122,13 @@ function MobileLayoutTabs() {
       <Tabs.Screen name="index" options={{ href: null }} />
       <Tabs.Screen
         name="home"
+        listeners={{
+          tabPress: () => {
+            if (pathname === "/home") {
+              emitTabScrollToTop("home");
+            }
+          },
+        }}
         options={{
           href: "/home",
           title: "Home",
@@ -129,6 +140,13 @@ function MobileLayoutTabs() {
       />
       <Tabs.Screen
         name="invest"
+        listeners={{
+          tabPress: () => {
+            if (pathname === "/invest") {
+              emitTabScrollToTop("invest");
+            }
+          },
+        }}
         options={{
           title: "Investir",
           tabBarLabel: "Investir",
@@ -139,6 +157,13 @@ function MobileLayoutTabs() {
       />
       <Tabs.Screen
         name="transferts"
+        listeners={{
+          tabPress: () => {
+            if (pathname === "/transferts") {
+              emitTabScrollToTop("transferts");
+            }
+          },
+        }}
         options={{
           title: "Virements",
           tabBarLabel: "Virements",
@@ -149,6 +174,13 @@ function MobileLayoutTabs() {
       />
       <Tabs.Screen
         name="vault"
+        listeners={{
+          tabPress: () => {
+            if (pathname === "/vault") {
+              emitTabScrollToTop("vault");
+            }
+          },
+        }}
         options={{
           title: "Vault",
           tabBarLabel: "Vault",
@@ -162,6 +194,13 @@ function MobileLayoutTabs() {
       <Tabs.Screen name="vault-workflows" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen
         name="hub"
+        listeners={{
+          tabPress: () => {
+            if (pathname === "/hub") {
+              emitTabScrollToTop("hub");
+            }
+          },
+        }}
         options={{
           title: "Hub",
           tabBarLabel: "Hub",
@@ -205,9 +244,11 @@ function MobileLayoutTabs() {
       <Tabs.Screen name="analytics" options={{ href: null, tabBarStyle: { display: "none" } }} />
 
       <Tabs.Screen name="qr-scan" options={{ href: null, tabBarStyle: { display: "none" } }} />
+      <Tabs.Screen name="qr-scan-confirm" options={{ href: null, tabBarStyle: { display: "none" } }} />
 
       <Tabs.Screen name="widget-create" options={{ href: null, tabBarStyle: { display: "none" } }} />
 
+      <Tabs.Screen name="authorize-payment" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="transaction-detail" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="transactions" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen
@@ -252,6 +293,7 @@ export default function MobileLayout() {
       <WebPhoneFrame>
         <MobileAuthProvider>
           <PortalProvider>
+            <PaymentAuthorizationListener />
             <MobileLayoutTabs />
           </PortalProvider>
         </MobileAuthProvider>

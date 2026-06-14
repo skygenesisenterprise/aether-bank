@@ -1,17 +1,21 @@
 import * as React from "react";
 
 import { MaterialIcons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { ScreenTransition } from "@/components/mobile/screen-transition";
 import { usePhoneSafeAreaInsets } from "@/components/mobile/use-phone-safe-area";
-import { type Transaction, categoryConfig, transactions } from "@/data/transactions";
-
-
+import { getTransactionsForAccount } from "@/data/account-transactions";
+import { accounts } from "@/data/accounts";
+import { type Transaction, categoryConfig } from "@/data/transactions";
 
 export default function TransactionsScreen() {
   const insets = usePhoneSafeAreaInsets();
+  const params = useLocalSearchParams<{ accountId?: string }>();
+  const accountId = typeof params.accountId === "string" ? params.accountId : undefined;
+  const account = accounts.find((currentAccount) => currentAccount.id === accountId) ?? accounts[0];
+  const scopedTransactions = getTransactionsForAccount(account.id);
 
   return (
     <ScreenTransition direction="up">
@@ -23,12 +27,19 @@ export default function TransactionsScreen() {
           ]}
           showsVerticalScrollIndicator={false}
         >
-          <Header />
-          <SummaryCard />
+          <Header accountLabel={account.label} />
+          <SummaryCard accountLabel={account.label} transactions={scopedTransactions} />
           <View style={styles.transactionsCard}>
-            <Text style={styles.sectionTitle}>Toutes les opérations</Text>
-            {transactions.map((transaction, index) => (
-              <TransactionRow key={`${transaction.title}-${transaction.amount}-${index}`} transaction={transaction} isLast={index === transactions.length - 1} />
+            <Text style={styles.sectionTitle}>Operations du compte</Text>
+            <Text style={styles.sectionSubtitle}>{account.type} · {account.holder}</Text>
+            {scopedTransactions.map((transaction, index) => (
+              <TransactionRow
+                key={`${transaction.title}-${transaction.amount}-${index}`}
+                accountId={account.id}
+                transaction={transaction}
+                transactionIndex={index}
+                isLast={index === scopedTransactions.length - 1}
+              />
             ))}
           </View>
         </ScrollView>
@@ -37,28 +48,38 @@ export default function TransactionsScreen() {
   );
 }
 
-function Header() {
+function Header({ accountLabel }: { accountLabel: string }) {
   return (
     <View style={styles.header}>
       <Pressable style={styles.closeButton} onPress={() => router.back()}>
         <MaterialIcons name="close" size={22} color="#FFFFFF" />
       </Pressable>
-      <Text style={styles.headerTitle}>Toutes les transactions</Text>
+      <View style={styles.headerCenter}>
+        <Text style={styles.headerTitle}>Toutes les transactions</Text>
+        <Text style={styles.headerSubtitle}>{accountLabel}</Text>
+      </View>
       <View style={styles.headerSpacer} />
     </View>
   );
 }
 
-function SummaryCard() {
+function SummaryCard({
+  accountLabel,
+  transactions,
+}: {
+  accountLabel: string;
+  transactions: Transaction[];
+}) {
   const totalCredits = transactions
-    .filter((t) => t.tone === "credit")
-    .reduce((sum, t) => sum + parseFloat(t.amount.replace(/[^0-9.,]/g, "").replace(",", ".")), 0);
+    .filter((transaction) => transaction.tone === "credit")
+    .reduce((sum, transaction) => sum + parseFloat(transaction.amount.replace(/[^0-9.,]/g, "").replace(",", ".")), 0);
   const totalDebits = transactions
-    .filter((t) => t.tone === "debit")
-    .reduce((sum, t) => sum + parseFloat(t.amount.replace(/[^0-9.,]/g, "").replace(",", ".")), 0);
+    .filter((transaction) => transaction.tone === "debit")
+    .reduce((sum, transaction) => sum + parseFloat(transaction.amount.replace(/[^0-9.,]/g, "").replace(",", ".")), 0);
 
   return (
     <View style={styles.summaryCard}>
+      <Text style={styles.summaryAccountLabel}>{accountLabel}</Text>
       <View style={styles.summaryRow}>
         <View style={styles.summaryItem}>
           <Text style={styles.summaryLabel}>Crédits</Text>
@@ -79,12 +100,35 @@ function SummaryCard() {
   );
 }
 
-function TransactionRow({ transaction, isLast }: { transaction: Transaction; isLast: boolean }) {
-  const cat = categoryConfig[transaction.category];
+function TransactionRow({
+  accountId,
+  transaction,
+  transactionIndex,
+  isLast,
+}: {
+  accountId: string;
+  transaction: Transaction;
+  transactionIndex: number;
+  isLast: boolean;
+}) {
+  const category = categoryConfig[transaction.category];
+
   return (
-    <Pressable style={[styles.transactionRow, isLast && styles.transactionRowLast]} onPress={() => router.push(`/transaction-detail?title=${encodeURIComponent(transaction.title)}`)}>
-      <View style={[styles.transactionIcon, { backgroundColor: cat.bgColor }]}>
-        <MaterialIcons name={transaction.icon} size={20} color={cat.color} />
+    <Pressable
+      style={[styles.transactionRow, isLast && styles.transactionRowLast]}
+      onPress={() =>
+        router.push({
+          pathname: "/transaction-detail",
+          params: {
+            accountId,
+            title: transaction.title,
+            transactionIndex: String(transactionIndex),
+          },
+        })
+      }
+    >
+      <View style={[styles.transactionIcon, { backgroundColor: category.bgColor }]}>
+        <MaterialIcons name={transaction.icon} size={20} color={category.color} />
       </View>
       <View style={styles.transactionCopy}>
         <Text style={styles.transactionTitle}>{transaction.title}</Text>
@@ -94,7 +138,7 @@ function TransactionRow({ transaction, isLast }: { transaction: Transaction; isL
         <Text style={[styles.transactionAmount, transaction.tone === "credit" ? styles.creditAmount : styles.debitAmount]}>
           {transaction.amount}
         </Text>
-        <Text style={styles.transactionCategory}>{cat.label}</Text>
+        <Text style={styles.transactionCategory}>{category.label}</Text>
       </View>
     </Pressable>
   );
@@ -122,12 +166,23 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     backgroundColor: "#111827",
   },
+  headerCenter: {
+    alignItems: "center",
+    flex: 1,
+  },
   headerTitle: {
     color: "#05070A",
     fontSize: 18,
     lineHeight: 23,
     fontWeight: "900",
     textAlign: "center",
+  },
+  headerSubtitle: {
+    color: "#9CA3AF",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "700",
+    marginTop: 1,
   },
   headerSpacer: {
     width: 42,
@@ -139,6 +194,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#D1D5DB",
+  },
+  summaryAccountLabel: {
+    color: "#6B7280",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "800",
+    marginBottom: 14,
   },
   summaryRow: {
     flexDirection: "row",
@@ -192,6 +254,13 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontWeight: "900",
     marginBottom: 5,
+  },
+  sectionSubtitle: {
+    color: "#6B7280",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "700",
+    marginBottom: 4,
   },
   transactionRow: {
     flexDirection: "row",

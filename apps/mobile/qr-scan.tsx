@@ -1,7 +1,7 @@
 import * as React from "react";
 
 import { MaterialIcons } from "@expo/vector-icons";
-import { router, usePathname } from "expo-router";
+import { router, useLocalSearchParams, usePathname } from "expo-router";
 import { AppState, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { BarcodeScanningResult } from "expo-camera/build/Camera.types";
@@ -11,6 +11,7 @@ import CameraManager from "expo-camera/build/ExpoCameraManager";
 import { ScreenTransition } from "@/components/mobile/screen-transition";
 import { usePhoneSafeAreaInsets } from "@/components/mobile/use-phone-safe-area";
 import { type Account, accounts } from "@/data/accounts";
+import { parseQrPaymentPayload } from "@/services/qr-payment";
 
 interface CameraPermissionResponse {
   granted: boolean;
@@ -19,18 +20,48 @@ interface CameraPermissionResponse {
   expires: string;
 }
 
+interface QrAccountContent {
+  title: string;
+  subtitle: string;
+  qrHint: string;
+  preparedMessage: string;
+}
+
+const qrAccountContent: Record<string, QrAccountContent> = {
+  "aether-salary": {
+    title: "Scanner un QR code",
+    subtitle: "Scannez un QR code marchand pour preparer un paiement depuis votre compte personnel Aether.",
+    qrHint: "QR marchand, demande de paiement ou reference compatible SEPA / Aether Pay pour vos depenses personnelles.",
+    preparedMessage: "Paiement personnel prepare. Le debit sera rattache a vos depenses du quotidien.",
+  },
+  joint: {
+    title: "Scanner pour le compte joint",
+    subtitle: "Scannez un QR code de foyer ou de depense partagee depuis votre compte joint.",
+    qrHint: "QR marchand foyer, depense partagee ou appel de fonds compatible SEPA / Aether Pay.",
+    preparedMessage: "Paiement du foyer prepare. Cette operation sera rattachee au budget commun.",
+  },
+  epargne: {
+    title: "Scanner depuis l'epargne",
+    subtitle: "Scannez un QR code de transfert ou d'investissement depuis votre espace epargne.",
+    qrHint: "QR de transfert interne, depot d'investissement ou reference compatible epargne / Aether Pay.",
+    preparedMessage: "Operation d'epargne preparee. Le mouvement sera traite comme allocation ou investissement.",
+  },
+  "sge-operations": {
+    title: "Scanner un QR pro",
+    subtitle: "Scannez un QR code fournisseur ou marchand depuis votre compte professionnel SGE.",
+    qrHint: "QR fournisseur, note de frais, encaissement ou demande de paiement B2B compatible SEPA / Aether Pay.",
+    preparedMessage: "Paiement professionnel prepare. Cette operation sera rattachee a la tresorerie SGE.",
+  },
+};
+
 export default function QrScanScreen() {
   const insets = usePhoneSafeAreaInsets();
   const pathname = usePathname();
-  const payableAccounts = React.useMemo(
-    () => accounts.filter((account) => account.type === "Personnel" || account.type === "Professionnel"),
-    [],
-  );
+  const params = useLocalSearchParams<{ accountId?: string }>();
   const [permission, setPermission] = React.useState<CameraPermissionResponse | null>(null);
   const [isScanEnabled, setIsScanEnabled] = React.useState(true);
   const [scannedValue, setScannedValue] = React.useState<string | null>(null);
   const [appState, setAppState] = React.useState(AppState.currentState);
-  const [selectedAccountId, setSelectedAccountId] = React.useState(payableAccounts[0]?.id ?? accounts[0]?.id ?? "");
 
   React.useEffect(() => {
     let isMounted = true;
@@ -62,15 +93,6 @@ export default function QrScanScreen() {
     };
   }, []);
 
-  const handleScan = React.useCallback((result: BarcodeScanningResult) => {
-    if (!isScanEnabled) {
-      return;
-    }
-
-    setIsScanEnabled(false);
-    setScannedValue(result.data);
-  }, [isScanEnabled]);
-
   const handleRetry = React.useCallback(() => {
     setScannedValue(null);
     setIsScanEnabled(true);
@@ -90,11 +112,42 @@ export default function QrScanScreen() {
     router.push("/home");
   }, []);
 
-  const selectedAccount = React.useMemo<Account | undefined>(
-    () => payableAccounts.find((account) => account.id === selectedAccountId) ?? payableAccounts[0] ?? accounts[0],
-    [payableAccounts, selectedAccountId],
-  );
+  const selectedAccount = React.useMemo<Account | undefined>(() => {
+    const selectedAccountId = typeof params.accountId === "string" ? params.accountId : undefined;
+    return accounts.find((account) => account.id === selectedAccountId) ?? accounts[0];
+  }, [params.accountId]);
+  const selectedAccountContent = React.useMemo<QrAccountContent>(() => {
+    if (!selectedAccount) {
+      return qrAccountContent["aether-salary"];
+    }
+
+    return qrAccountContent[selectedAccount.id] ?? qrAccountContent["aether-salary"];
+  }, [selectedAccount]);
   const isCameraActive = pathname === "/qr-scan" && appState === "active";
+
+  const handleScan = React.useCallback((result: BarcodeScanningResult) => {
+    if (!isScanEnabled) {
+      return;
+    }
+
+    setIsScanEnabled(false);
+    setScannedValue(result.data);
+
+    const parsedPayment = parseQrPaymentPayload(result.data);
+
+    router.push({
+      pathname: "/qr-scan-confirm",
+      params: {
+        accountId: selectedAccount?.id,
+        merchantName: parsedPayment.merchantName,
+        merchantCity: parsedPayment.merchantCity,
+        amountMinor: String(parsedPayment.amountMinor),
+        currency: parsedPayment.currency,
+        label: parsedPayment.label,
+        reference: parsedPayment.reference,
+      },
+    });
+  }, [isScanEnabled, selectedAccount?.id]);
 
   return (
     <ScreenTransition direction="up">
@@ -112,33 +165,10 @@ export default function QrScanScreen() {
             <View style={styles.headerSpacer} />
           </View>
 
-          <Text style={styles.pageTitle}>Scanner un QR code</Text>
+          <Text style={styles.pageTitle}>{selectedAccountContent.title}</Text>
           <Text style={styles.pageSubtitle}>
-            Scannez un QR code marchand pour preparer un paiement depuis votre compte Aether.
+            {selectedAccountContent.subtitle}
           </Text>
-
-          <View style={styles.accountTypeRow}>
-            {payableAccounts.map((account) => {
-              const isActive = account.id === selectedAccount?.id;
-
-              return (
-                <Pressable
-                  key={account.id}
-                  style={[styles.accountTypePill, isActive && styles.accountTypePillActive]}
-                  onPress={() => setSelectedAccountId(account.id)}
-                >
-                  <Text style={[styles.accountTypeText, isActive && styles.accountTypeTextActive]}>{account.type}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <View style={styles.accountCard}>
-            <Text style={styles.accountLabel}>Compte debite</Text>
-            <Text style={styles.accountName}>{selectedAccount?.label ?? "Compte principal"}</Text>
-            <Text style={styles.accountBalance}>{selectedAccount?.balance ?? "€0.00"}</Text>
-            <Text style={styles.accountMeta}>{selectedAccount?.holder ?? "Titulaire inconnu"}</Text>
-          </View>
 
           <View style={styles.cameraCard}>
             {Platform.OS === "web" ? (
@@ -186,7 +216,7 @@ export default function QrScanScreen() {
                 {scannedValue}
               </Text>
               <Text style={styles.resultDescription}>
-                Paiement prepare depuis {selectedAccount?.type?.toLowerCase() ?? "le compte choisi"}. TODO: connecter le parseur du QR code puis l'ecran de confirmation de paiement.
+                {selectedAccountContent.preparedMessage} TODO: connecter le parseur du QR code puis l'ecran de confirmation de paiement.
               </Text>
               <View style={styles.resultActions}>
                 <Pressable style={styles.secondaryButton} onPress={handleRetry}>
@@ -197,14 +227,17 @@ export default function QrScanScreen() {
                 </Pressable>
               </View>
             </View>
-          ) : (
-            <View style={styles.helpCard}>
-              <Text style={styles.helpTitle}>Format attendu</Text>
-              <Text style={styles.helpText}>
-                QR marchand, demande de paiement ou reference compatible SEPA / Aether Pay.
-              </Text>
+          ) : null}
+
+          <View style={styles.tipCard}>
+            <View style={styles.tipHeader}>
+              <MaterialIcons name="tips-and-updates" size={18} color="#B45309" />
+              <Text style={styles.tipTitle}>Conseil</Text>
             </View>
-          )}
+            <Text style={styles.tipText}>
+              Centrez le QR code dans le cadre et gardez le telephone stable pendant une seconde pour un scan plus rapide.
+            </Text>
+          </View>
         </ScrollView>
       </View>
     </ScreenTransition>
@@ -257,70 +290,6 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     fontWeight: "600",
     marginTop: 10,
-  },
-  accountTypeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 18,
-  },
-  accountTypePill: {
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: "#FFFFFF",
-  },
-  accountTypePillActive: {
-    borderColor: "#111827",
-    backgroundColor: "#111827",
-  },
-  accountTypeText: {
-    color: "#6B7280",
-    fontSize: 13,
-    lineHeight: 17,
-    fontWeight: "900",
-  },
-  accountTypeTextActive: {
-    color: "#FFFFFF",
-  },
-  accountCard: {
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 18,
-    padding: 16,
-    marginTop: 22,
-    backgroundColor: "#FFFFFF",
-  },
-  accountLabel: {
-    color: "#6B7280",
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: "800",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-  },
-  accountName: {
-    color: "#05070A",
-    fontSize: 18,
-    lineHeight: 22,
-    fontWeight: "900",
-    marginTop: 10,
-  },
-  accountBalance: {
-    color: "#111827",
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: "700",
-    marginTop: 4,
-  },
-  accountMeta: {
-    color: "#6B7280",
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: "600",
-    marginTop: 8,
   },
   cameraCard: {
     marginTop: 18,
@@ -413,22 +382,27 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 16,
   },
-  helpCard: {
+  tipCard: {
     borderWidth: 1,
-    borderColor: "#D1D5DB",
+    borderColor: "#FDE68A",
     borderRadius: 18,
     padding: 16,
     marginTop: 18,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#FFFBEA",
   },
-  helpTitle: {
-    color: "#05070A",
-    fontSize: 16,
-    lineHeight: 20,
+  tipHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  tipTitle: {
+    color: "#92400E",
+    fontSize: 15,
+    lineHeight: 19,
     fontWeight: "900",
   },
-  helpText: {
-    color: "#6B7280",
+  tipText: {
+    color: "#B45309",
     fontSize: 13,
     lineHeight: 19,
     fontWeight: "600",

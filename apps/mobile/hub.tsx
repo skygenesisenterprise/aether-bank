@@ -5,6 +5,8 @@ import { router } from "expo-router";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { ScreenTransition } from "@/components/mobile/screen-transition";
+import { simulatePaymentAuthorizationRequest } from "@/components/mobile/payment-authorization-listener";
+import { useTabScrollToTop } from "@/components/mobile/tab-scroll-to-top";
 import { usePhoneSafeAreaInsets } from "@/components/mobile/use-phone-safe-area";
 
 type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
@@ -73,17 +75,22 @@ const systemStatus: { label: string; status: string; color: string }[] = [
 
 export default function HubScreen() {
   const insets = usePhoneSafeAreaInsets();
+  const scrollRef = React.useRef<ScrollView>(null);
+
+  useTabScrollToTop("hub", scrollRef);
 
   return (
     <ScreenTransition direction="up">
       <View style={styles.safeArea}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[styles.content, { paddingTop: insets.top + 6, paddingBottom: insets.bottom + 100 }]}
           showsVerticalScrollIndicator={false}
         >
           <HubHeader />
           <HubHero />
           <QuickActionsGrid />
+          <PrototypePaymentSection />
           <ServicesSection />
           <PrivacySection />
           {hasOrganizationAccess && <OrganizationSection />}
@@ -111,7 +118,7 @@ function HubHeader() {
         <Pressable style={styles.headerIconButton} onPress={() => Alert.alert("Notifications", "Aucune notification pour le moment.")}>
           <MaterialIcons name="notifications" size={20} color="#111827" />
         </Pressable>
-        <Pressable style={styles.headerIconButton} onPress={() => router.push("/settings")}>
+        <Pressable style={styles.headerIconButton} onPress={() => router.push("/profile-settings")}>
           <MaterialIcons name="settings" size={20} color="#111827" />
         </Pressable>
       </View>
@@ -226,6 +233,33 @@ function OrganizationSection() {
           <MaterialIcons name="chevron-right" size={20} color="#D1D5DB" />
         </Pressable>
       ))}
+    </View>
+  );
+}
+
+function PrototypePaymentSection() {
+  return (
+    <View style={styles.prototypeCard}>
+      <View style={styles.prototypeHeader}>
+        <View style={styles.prototypeIconWrap}>
+          <MaterialIcons name="verified-user" size={20} color="#FFFFFF" />
+        </View>
+        <View style={styles.prototypeBadge}>
+          <Text style={styles.prototypeBadgeText}>Prototype</Text>
+        </View>
+      </View>
+      <Text style={styles.prototypeTitle}>Verification de paiement mobile</Text>
+      <Text style={styles.prototypeText}>
+        Simule un parcours 3-D Secure / Identity Check avec redirection globale vers l'ecran d'autorisation.
+      </Text>
+      <Pressable
+        accessibilityLabel="Simuler une verification de paiement"
+        style={styles.prototypeButton}
+        onPress={() => simulatePaymentAuthorizationRequest("auth_ovh_pending")}
+      >
+        <MaterialIcons name="play-arrow" size={18} color="#FFFFFF" />
+        <Text style={styles.prototypeButtonText}>Simuler verification paiement</Text>
+      </Pressable>
     </View>
   );
 }
@@ -462,6 +496,70 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 11,
     lineHeight: 14,
+    fontWeight: "900",
+  },
+
+  // Prototype payment
+  prototypeCard: {
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 14,
+    backgroundColor: "#111827",
+  },
+  prototypeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  prototypeIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.18)",
+  },
+  prototypeBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "rgba(255,255,255,0.14)",
+  },
+  prototypeBadgeText: {
+    color: "#E5E7EB",
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "900",
+  },
+  prototypeTitle: {
+    color: "#FFFFFF",
+    fontSize: 19,
+    lineHeight: 24,
+    fontWeight: "900",
+    marginBottom: 6,
+  },
+  prototypeText: {
+    color: "#D1D5DB",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "600",
+    marginBottom: 16,
+  },
+  prototypeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    backgroundColor: "#2563EB",
+  },
+  prototypeButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    lineHeight: 17,
     fontWeight: "900",
   },
 

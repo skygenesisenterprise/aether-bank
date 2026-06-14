@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { ScreenTransition } from "@/components/mobile/screen-transition";
+import { useTabScrollToTop } from "@/components/mobile/tab-scroll-to-top";
 import { usePhoneSafeAreaInsets } from "@/components/mobile/use-phone-safe-area";
 
 type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
@@ -80,11 +81,15 @@ const quickActions: QuickAction[] = [
 
 export default function InvestScreen() {
   const insets = usePhoneSafeAreaInsets();
+  const scrollRef = React.useRef<ScrollView>(null);
+
+  useTabScrollToTop("invest", scrollRef);
 
   return (
     <ScreenTransition>
       <View style={styles.safeArea}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[styles.content, { paddingTop: insets.top + 6, paddingBottom: insets.bottom + 100 }]}
           showsVerticalScrollIndicator={false}
         >

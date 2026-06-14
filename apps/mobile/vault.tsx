@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 
 import { ScreenTransition } from "@/components/mobile/screen-transition";
+import { useTabScrollToTop } from "@/components/mobile/tab-scroll-to-top";
 import { usePhoneSafeAreaInsets } from "@/components/mobile/use-phone-safe-area";
 
 type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
@@ -200,7 +201,10 @@ function getAvailabilityLabel(availability: VaultAvailability) {
 
 export default function VaultScreen() {
   const insets = usePhoneSafeAreaInsets();
+  const scrollRef = React.useRef<ScrollView>(null);
   const [automations, setAutomations] = React.useState(vaultScreenData.automations);
+
+  useTabScrollToTop("vault", scrollRef);
 
   const handleAddVault = React.useCallback(() => {
     router.push("/vault-create");
@@ -241,6 +245,7 @@ export default function VaultScreen() {
     <ScreenTransition>
       <View style={styles.safeArea}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[styles.content, { paddingTop: insets.top + 6, paddingBottom: insets.bottom + 100 }]}
           showsVerticalScrollIndicator={false}
         >

@@ -6,21 +6,31 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-nati
 
 import { ScreenTransition } from "@/components/mobile/screen-transition";
 import { usePhoneSafeAreaInsets } from "@/components/mobile/use-phone-safe-area";
-import { type Transaction, type IconName, categoryConfig, transactions } from "@/data/transactions";
-
-
+import { getTransactionsForAccount } from "@/data/account-transactions";
+import { accounts } from "@/data/accounts";
+import { type Transaction, type IconName, categoryConfig } from "@/data/transactions";
 
 export default function TransactionDetailScreen() {
   const insets = usePhoneSafeAreaInsets();
-  const { title } = useLocalSearchParams<{ title?: string }>();
+  const { accountId, title, transactionIndex } = useLocalSearchParams<{
+    accountId?: string;
+    title?: string;
+    transactionIndex?: string;
+  }>();
+  const resolvedAccountId = typeof accountId === "string" ? accountId : undefined;
   const decodedTitle = title ? decodeURIComponent(title) : "";
-  const transaction = transactions.find((t) => t.title === decodedTitle) ?? transactions[0];
-  const index = transactions.indexOf(transaction);
+  const scopedTransactions = getTransactionsForAccount(resolvedAccountId);
+  const account = accounts.find((currentAccount) => currentAccount.id === resolvedAccountId) ?? accounts[0];
+  const parsedTransactionIndex = typeof transactionIndex === "string" ? Number.parseInt(transactionIndex, 10) : -1;
+  const transaction = (
+    Number.isInteger(parsedTransactionIndex) && parsedTransactionIndex >= 0
+      ? scopedTransactions[parsedTransactionIndex]
+      : undefined
+  ) ?? scopedTransactions.find((currentTransaction) => currentTransaction.title === decodedTitle) ?? scopedTransactions[0];
+  const index = scopedTransactions.indexOf(transaction);
 
-  const cat = categoryConfig[transaction.category];
+  const category = categoryConfig[transaction.category];
   const isCredit = transaction.tone === "credit";
-  const rawAmount = transaction.amount.replace(/[^0-9.,]/g, "").replace(",", ".");
-  const numericAmount = parseFloat(rawAmount);
 
   return (
     <ScreenTransition direction="up">
@@ -32,11 +42,11 @@ export default function TransactionDetailScreen() {
           ]}
           showsVerticalScrollIndicator={false}
         >
-          <Header category={transaction.category} />
+          <Header accountId={account.id} accountLabel={account.label} category={transaction.category} />
 
           <View style={styles.heroCard}>
-            <View style={[styles.heroIcon, { backgroundColor: cat.bgColor }]}>
-              <MaterialIcons name={transaction.icon} size={32} color={cat.color} />
+            <View style={[styles.heroIcon, { backgroundColor: category.bgColor }]}>
+              <MaterialIcons name={transaction.icon} size={32} color={category.color} />
             </View>
             <Text style={styles.heroTitle}>{transaction.title}</Text>
             <Text style={[styles.heroAmount, { color: isCredit ? "#1F8A4C" : "#111827" }]}>
@@ -52,12 +62,13 @@ export default function TransactionDetailScreen() {
           <View style={styles.detailsCard}>
             <Text style={styles.detailsTitle}>Détails de l'opération</Text>
 
+            <DetailRow label="Compte" value={account.label} />
             <DetailRow label="Date" value={transaction.description.split("·")[0].trim()} />
             <DetailRow label="Moyen de paiement" value={transaction.description.includes("·") ? transaction.description.split("·")[1].trim() : "Carte bancaire"} />
             <DetailRow label="Type" value={isCredit ? "Versement entrant" : "Paiement sortant"} />
             <DetailRow label="Statut" value="Confirmée" valueTone="success" />
             <DetailRow label="ID transaction" value={`ATH-TXN-${String(index + 1).padStart(6, "0")}`} />
-            <DetailRow label="Catégorie" value={cat.label} />
+            <DetailRow label="Catégorie" value={category.label} />
             <DetailRow label="Bénéficiaire" value={transaction.title} />
             <DetailRow label="IBAN" value={`FR76 ${generateIban(index)}`} last />
           </View>
@@ -66,8 +77,8 @@ export default function TransactionDetailScreen() {
             <Text style={styles.detailsTitle}>Notes</Text>
             <Text style={styles.notesText}>
               {isCredit
-                ? `Paiement reçu de ${transaction.title}. Montant de ${transaction.amount} crédité sur votre compte.`
-                : `Débit de ${transaction.amount} effectué vers ${transaction.title}. Opération confirmée et sécurisée.`}
+                ? `Paiement reçu de ${transaction.title}. Montant de ${transaction.amount} crédité sur ${account.label}.`
+                : `Débit de ${transaction.amount} effectué vers ${transaction.title} depuis ${account.label}. Opération confirmée et sécurisée.`}
             </Text>
           </View>
 
@@ -93,16 +104,33 @@ export default function TransactionDetailScreen() {
   );
 }
 
-function Header({ category }: { category: Transaction["category"] }) {
-  const cat = categoryConfig[category];
+function Header({
+  accountId,
+  accountLabel,
+  category,
+}: {
+  accountId: string;
+  accountLabel: string;
+  category: Transaction["category"];
+}) {
+  const categoryConfigItem = categoryConfig[category];
+
   return (
     <View style={styles.header}>
-      <Pressable style={[styles.closeButton, { backgroundColor: cat.color }]} onPress={() => router.push("/transactions")}>
+      <Pressable
+        style={[styles.closeButton, { backgroundColor: categoryConfigItem.color }]}
+        onPress={() =>
+          router.push({
+            pathname: "/transactions",
+            params: { accountId },
+          })
+        }
+      >
         <MaterialIcons name="close" size={22} color="#FFFFFF" />
       </Pressable>
       <View style={styles.headerCenter}>
         <Text style={styles.headerTitle}>Détail de l'opération</Text>
-        <Text style={styles.headerCategory}>{cat.label}</Text>
+        <Text style={styles.headerCategory}>{accountLabel} · {categoryConfigItem.label}</Text>
       </View>
       <View style={styles.headerSpacer} />
     </View>
@@ -133,9 +161,9 @@ function MetaRow({ icon, label, value, last }: { icon: IconName; label: string; 
   );
 }
 
-function generateIban(index: number): string {
+function generateIban(index: number) {
   const parts = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 5; i += 1) {
     const block = String((index * 1234 + i * 9999) % 100000).padStart(5, "0");
     parts.push(block);
   }
@@ -242,26 +270,26 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 10,
+    gap: 12,
+    paddingVertical: 11,
   },
   detailRowBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    borderBottomColor: "#E5E7EB",
   },
   detailLabel: {
     color: "#6B7280",
     fontSize: 13,
     lineHeight: 17,
     fontWeight: "700",
-    flex: 1,
   },
   detailValue: {
-    color: "#111827",
+    flexDirection: "row",
+    color: "#05070A",
     fontSize: 13,
     lineHeight: 17,
     fontWeight: "900",
     textAlign: "right",
-    flex: 1,
   },
   detailValueSuccess: {
     color: "#1F8A4C",
@@ -275,7 +303,7 @@ const styles = StyleSheet.create({
     borderColor: "#D1D5DB",
   },
   notesText: {
-    color: "#6B7280",
+    color: "#374151",
     fontSize: 13,
     lineHeight: 19,
     fontWeight: "600",
@@ -292,23 +320,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 10,
+    gap: 12,
+    paddingVertical: 11,
   },
   metaLeading: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    flex: 1,
+    gap: 8,
   },
   supportButton: {
+    minHeight: 52,
+    borderRadius: 18,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    borderRadius: 999,
-    paddingVertical: 14,
+    marginBottom: 8,
     backgroundColor: "#111827",
-    marginBottom: 14,
   },
   supportButtonText: {
     color: "#FFFFFF",
