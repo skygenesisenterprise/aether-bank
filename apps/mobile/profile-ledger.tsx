@@ -161,7 +161,7 @@ export default function ProfileLedgerScreen() {
   }, []);
 
   const handleViewLogs = React.useCallback(() => {
-    Alert.alert("Journaux Ledger", "Affichage des logs complets — fonctionnalité à venir.", [{ text: "OK" }]);
+    router.push("/profile-ledger-terminal");
   }, []);
 
   return (

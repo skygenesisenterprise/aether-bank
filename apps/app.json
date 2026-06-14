@@ -40,6 +40,18 @@
           }
         }
       ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Autorisez Aether Bank a utiliser Face ID pour deverrouiller l'application et confirmer votre identite."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Autorisez Aether Bank a utiliser la camera pour scanner un QR code de paiement."
+        }
+      ],
       "expo-font",
       "expo-web-browser"
     ],

@@ -9,7 +9,6 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 import "@/styles/globals.css";
 
 import { MobileAuthProvider, useMobileAuth } from "@/components/mobile/mobile-auth-provider";
-import { PushNotificationManager } from "@/components/mobile/push-notification-manager";
 import { PortalProvider } from "@/components/mobile/portal-provider";
 import { Colors } from "@/constants/theme";
 
@@ -59,7 +58,7 @@ function MobileLayoutTabs() {
   const pathname = usePathname();
   const scheme = useColorScheme();
   const theme = Colors[scheme === "dark" ? "dark" : "light"];
-  const { isAuthenticated, isHydrating } = useMobileAuth();
+  const { isAuthenticated, isHydrating, isLocked } = useMobileAuth();
 
   const isPublicRoute = pathname === "/" || pathname === "/login" || pathname === "/register" || pathname === "/unlock";
 
@@ -69,6 +68,10 @@ function MobileLayoutTabs() {
 
   if (!isAuthenticated && !isPublicRoute) {
     return <Redirect href="/login" />;
+  }
+
+  if (isAuthenticated && isLocked && pathname !== "/unlock") {
+    return <Redirect href="/unlock" />;
   }
 
   if (isAuthenticated && (pathname === "/" || pathname === "/login" || pathname === "/register")) {
@@ -145,15 +148,18 @@ function MobileLayoutTabs() {
         }}
       />
       <Tabs.Screen
-        name="mes-cartes"
+        name="vault"
         options={{
-          title: "Cartes",
-          tabBarLabel: "Cartes",
+          title: "Vault",
+          tabBarLabel: "Vault",
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="credit-card" color={color} focused={focused} />
+            <TabIcon name="account-balance" color={color} focused={focused} />
           ),
         }}
       />
+      <Tabs.Screen name="vault-fund" options={{ href: null, tabBarStyle: { display: "none" } }} />
+      <Tabs.Screen name="vault-create" options={{ href: null, tabBarStyle: { display: "none" } }} />
+      <Tabs.Screen name="vault-workflows" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen
         name="hub"
         options={{
@@ -176,6 +182,7 @@ function MobileLayoutTabs() {
       <Tabs.Screen name="profile-org" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="profile-financial" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="profile-ledger" options={{ href: null, tabBarStyle: { display: "none" } }} />
+      <Tabs.Screen name="profile-ledger-terminal" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="profile-support" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="profile-settings" options={{ href: null, tabBarStyle: { display: "none" } }} />
 
@@ -192,6 +199,10 @@ function MobileLayoutTabs() {
       <Tabs.Screen name="account-vault" options={{ href: null, tabBarStyle: { display: "none" } }} />
 
       <Tabs.Screen name="analytics" options={{ href: null, tabBarStyle: { display: "none" } }} />
+
+      <Tabs.Screen name="qr-scan" options={{ href: null, tabBarStyle: { display: "none" } }} />
+
+      <Tabs.Screen name="widget-create" options={{ href: null, tabBarStyle: { display: "none" } }} />
 
       <Tabs.Screen name="transaction-detail" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="transactions" options={{ href: null, tabBarStyle: { display: "none" } }} />
@@ -235,15 +246,13 @@ export default function MobileLayout() {
   return (
     <SafeAreaProvider initialMetrics={phoneInitialMetrics}>
       <StatusBar style="dark" />
-      <PushNotificationManager>
-        <WebPhoneFrame>
-          <MobileAuthProvider>
-            <PortalProvider>
-              <MobileLayoutTabs />
-            </PortalProvider>
-          </MobileAuthProvider>
-        </WebPhoneFrame>
-      </PushNotificationManager>
+      <WebPhoneFrame>
+        <MobileAuthProvider>
+          <PortalProvider>
+            <MobileLayoutTabs />
+          </PortalProvider>
+        </MobileAuthProvider>
+      </WebPhoneFrame>
     </SafeAreaProvider>
   );
 }

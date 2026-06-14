@@ -17,7 +17,7 @@ import { usePhoneSafeAreaInsets } from "@/components/mobile/use-phone-safe-area"
 
 export default function LoginScreen() {
   const insets = usePhoneSafeAreaInsets();
-  const { isAuthenticated, isHydrating, signIn } = useMobileAuth();
+  const { biometricAvailable, biometricEnabled, biometricLabel, isAuthenticated, isHydrating, signIn } = useMobileAuth();
   const [email, setEmail] = React.useState("admin@aetherbank.me");
   const [password, setPassword] = React.useState("admin123");
 
@@ -196,6 +196,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 20,
     fontWeight: "900",
+  },
+  helperText: {
+    color: "#6B7280",
+    textAlign: "center",
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "600",
+    marginTop: -4,
   },
   dividerRow: {
     flexDirection: "row",

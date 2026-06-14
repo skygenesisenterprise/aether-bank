@@ -1,20 +1,21 @@
 import * as React from "react";
 
 import { MaterialIcons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { Alert, Animated as NativeAnimated, LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent, PanResponder, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
+import { Alert, LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { Bar, BarChart, ResponsiveContainer, XAxis } from "recharts";
 
 import { ScreenTransition } from "@/components/mobile/screen-transition";
 import { usePhoneSafeAreaInsets } from "@/components/mobile/use-phone-safe-area";
 import { usePortal } from "@/components/mobile/portal-provider";
+import { type HomeWidgetConfig, type HomeWidgetId, defaultHomeWidgets } from "@/data/home-widgets";
 import { type Transaction, categoryConfig, transactions } from "@/data/transactions";
 import { type Account, accounts } from "@/data/accounts";
 
 type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
 
-type QuickActionType = "add" | "betweenAccounts" | "info" | "more";
+type QuickActionType = "add" | "betweenAccounts" | "qrPay" | "more";
 
 const destinationAccounts = [
   { label: "Vault Infrastructure", balance: "€284,500.00", meta: "Coffre" },
@@ -58,21 +59,6 @@ interface BankCard {
   icon: IconName;
 }
 
-type HomeWidgetId =
-  | "activity"
-  | "monthlySpending"
-  | "beneficiaries"
-  | "cards"
-  | "categorySpending"
-  | "scheduledTransfers"
-  | "savingGoals"
-  | "recentDocuments";
-
-interface HomeWidgetConfig {
-  id: HomeWidgetId;
-  enabled: boolean;
-}
-
 interface HomeWidgetDefinition {
   Component: React.ComponentType;
 }
@@ -80,7 +66,7 @@ interface HomeWidgetDefinition {
 const quickActions: QuickAction[] = [
   { title: "Ajouter de l'argent", icon: "add", action: "add" },
   { title: "Entre mes comptes", icon: "shuffle", action: "betweenAccounts" },
-  { title: "Informations", icon: "account-balance", action: "info" },
+  { title: "Payer QR", icon: "qr-code-scanner", action: "qrPay" },
   { title: "Plus", icon: "more-horiz", action: "more" },
 ];
 
@@ -223,17 +209,6 @@ const recentDocuments: RecentDocument[] = [
   { title: "Attestation de compte", date: "3 mai 2026", icon: "verified" },
 ];
 
-const defaultHomeWidgets: HomeWidgetConfig[] = [
-  { id: "activity", enabled: true },
-  { id: "monthlySpending", enabled: true },
-  { id: "beneficiaries", enabled: true },
-  { id: "cards", enabled: true },
-  { id: "categorySpending", enabled: true },
-  { id: "scheduledTransfers", enabled: true },
-  { id: "savingGoals", enabled: true },
-  { id: "recentDocuments", enabled: true },
-];
-
 const homeWidgetRegistry: Record<HomeWidgetId, HomeWidgetDefinition> = {
   activity: { Component: ActivitySection },
   monthlySpending: { Component: MonthlySpendingSection },
@@ -247,36 +222,41 @@ const homeWidgetRegistry: Record<HomeWidgetId, HomeWidgetDefinition> = {
 
 const HOME_HEADER_HEIGHT = 62;
 
-function moveWidget<T>(items: T[], fromIndex: number, toIndex: number) {
-  if (fromIndex === toIndex) {
-    return items;
-  }
-
-  const nextItems = [...items];
-  const [movedItem] = nextItems.splice(fromIndex, 1);
-
-  nextItems.splice(toIndex, 0, movedItem);
-
-  return nextItems;
-}
-
 export default function HomeScreen() {
   const insets = usePhoneSafeAreaInsets();
+  const params = useLocalSearchParams<{ widgetOrder?: string; updatedAt?: string }>();
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [activeQuickAction, setActiveQuickAction] = React.useState<QuickActionType | null>(null);
   const [refreshing, setRefreshing] = React.useState(false);
   const [homeWidgets, setHomeWidgets] = React.useState(defaultHomeWidgets);
-  const [draggingWidgetId, setDraggingWidgetId] = React.useState<HomeWidgetId | null>(null);
   const portal = usePortal();
-  const widgetLayoutsRef = React.useRef<Partial<Record<HomeWidgetId, { y: number; height: number }>>>({});
-  const homeWidgetsRef = React.useRef(homeWidgets);
-  const draggingWidgetIdRef = React.useRef<HomeWidgetId | null>(null);
-  const dragStartIndexRef = React.useRef<number | null>(null);
-  const dragTranslateY = React.useRef(new NativeAnimated.Value(0)).current;
+  const lastHandledUpdatedAtRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
-    homeWidgetsRef.current = homeWidgets;
-  }, [homeWidgets]);
+    const widgetOrder = params.widgetOrder;
+    const updatedAt = params.updatedAt;
+
+    if (typeof widgetOrder !== "string" || typeof updatedAt !== "string" || lastHandledUpdatedAtRef.current === updatedAt) {
+      return;
+    }
+
+    lastHandledUpdatedAtRef.current = updatedAt;
+
+    const orderedWidgetIds = widgetOrder
+      .split(",")
+      .map((widgetId) => widgetId.trim())
+      .filter((widgetId): widgetId is HomeWidgetId => defaultHomeWidgets.some((widget) => widget.id === widgetId));
+
+    setHomeWidgets(() => {
+      const orderedSet = new Set(orderedWidgetIds);
+      const orderedWidgets = orderedWidgetIds.map((widgetId) => ({ id: widgetId, enabled: true }));
+      const remainingWidgets = defaultHomeWidgets
+        .filter((widget) => !orderedSet.has(widget.id))
+        .map((widget) => ({ ...widget, enabled: false }));
+
+      return [...orderedWidgets, ...remainingWidgets];
+    });
+  }, [params.updatedAt, params.widgetOrder]);
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
@@ -288,56 +268,6 @@ export default function HomeScreen() {
     setActiveQuickAction(null);
   }, []);
 
-  const handleWidgetLayout = React.useCallback((widgetId: HomeWidgetId, event: LayoutChangeEvent) => {
-    const { y, height } = event.nativeEvent.layout;
-    widgetLayoutsRef.current[widgetId] = { y, height };
-  }, []);
-
-  const handleWidgetDragStart = React.useCallback((widgetId: HomeWidgetId) => {
-    const currentIndex = homeWidgetsRef.current.findIndex((widget) => widget.id === widgetId);
-    if (currentIndex === -1) {
-      return;
-    }
-
-    dragStartIndexRef.current = currentIndex;
-    draggingWidgetIdRef.current = widgetId;
-    dragTranslateY.setValue(0);
-    setDraggingWidgetId(widgetId);
-  }, [dragTranslateY]);
-
-  const handleWidgetDragEnd = React.useCallback((dragOffsetY: number) => {
-    const draggedWidgetId = draggingWidgetIdRef.current;
-    const startIndex = dragStartIndexRef.current;
-
-    if (draggedWidgetId === null || startIndex === null) {
-      dragTranslateY.setValue(0);
-      setDraggingWidgetId(null);
-      return;
-    }
-
-    const widgetLayouts = homeWidgetsRef.current
-      .map((widget) => ({
-        id: widget.id,
-        layout: widgetLayoutsRef.current[widget.id],
-      }))
-      .filter((widget): widget is { id: HomeWidgetId; layout: { y: number; height: number } } => widget.layout !== undefined);
-
-    const draggedLayout = widgetLayoutsRef.current[draggedWidgetId];
-    let targetIndex = startIndex;
-
-    if (draggedLayout) {
-      const draggedCenterY = draggedLayout.y + dragOffsetY + draggedLayout.height / 2;
-      const foundIndex = widgetLayouts.findIndex((widget) => draggedCenterY < widget.layout.y + widget.layout.height / 2);
-      targetIndex = foundIndex === -1 ? widgetLayouts.length - 1 : foundIndex;
-    }
-
-    setHomeWidgets((currentWidgets) => moveWidget(currentWidgets, startIndex, targetIndex));
-    dragStartIndexRef.current = null;
-    draggingWidgetIdRef.current = null;
-    setDraggingWidgetId(null);
-    dragTranslateY.setValue(0);
-  }, [dragTranslateY]);
-
   React.useEffect(() => {
     switch (activeQuickAction) {
       case "add":
@@ -345,9 +275,6 @@ export default function HomeScreen() {
         break;
       case "betweenAccounts":
         portal.setPortalContent(<BetweenAccountsPanel account={activeAccount} onClose={handleCloseQuickAction} />);
-        break;
-      case "info":
-        portal.setPortalContent(<AccountInfoPanel account={activeAccount} onClose={handleCloseQuickAction} />);
         break;
       case "more":
         portal.setPortalContent(<MoreOptionsPanel account={activeAccount} onClose={handleCloseQuickAction} />);
@@ -367,14 +294,24 @@ export default function HomeScreen() {
         <ScrollView
           contentContainerStyle={[styles.content, { paddingTop: insets.top + 6 + HOME_HEADER_HEIGHT }]}
           showsVerticalScrollIndicator={false}
-          scrollEnabled={draggingWidgetId === null}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6B7280" colors={["#6B7280"]} />}
         >
           <HeroSection activeIndex={activeIndex} onIndexChange={setActiveIndex} />
 
           <View style={styles.quickActionRow}>
             {quickActions.map((action) => (
-              <QuickActionButton key={action.title} action={action} onPress={() => setActiveQuickAction(action.action)} />
+              <QuickActionButton
+                key={action.title}
+                action={action}
+                onPress={() => {
+                  if (action.action === "qrPay") {
+                    router.push("/qr-scan");
+                    return;
+                  }
+
+                  setActiveQuickAction(action.action);
+                }}
+              />
             ))}
           </View>
 
@@ -385,20 +322,13 @@ export default function HomeScreen() {
             .map((widget) => {
               const widgetDefinition = homeWidgetRegistry[widget.id];
               return (
-                <DraggableWidget
-                  key={widget.id}
-                  isDragging={draggingWidgetId === widget.id}
-                  translateY={dragTranslateY}
-                  widgetId={widget.id}
-                  WidgetComponent={widgetDefinition.Component}
-                  onDragEnd={handleWidgetDragEnd}
-                  onDragStart={handleWidgetDragStart}
-                  onLayout={handleWidgetLayout}
-                />
+                <View key={widget.id} style={styles.widgetSlot}>
+                  <widgetDefinition.Component />
+                </View>
               );
             })}
 
-          <AddWidgetButton />
+          <AddWidgetButton homeWidgets={homeWidgets} />
         </ScrollView>
       </View>
     </ScreenTransition>
@@ -583,60 +513,6 @@ function TransactionRow({ transaction }: { transaction: Transaction }) {
   );
 }
 
-function DraggableWidget({
-  widgetId,
-  WidgetComponent,
-  isDragging,
-  translateY,
-  onLayout,
-  onDragStart,
-  onDragEnd,
-}: {
-  widgetId: HomeWidgetId;
-  WidgetComponent: React.ComponentType;
-  isDragging: boolean;
-  translateY: NativeAnimated.Value;
-  onLayout: (widgetId: HomeWidgetId, event: LayoutChangeEvent) => void;
-  onDragStart: (widgetId: HomeWidgetId) => void;
-  onDragEnd: (dragOffsetY: number) => void;
-}) {
-  const panResponder = React.useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: () => {
-          onDragStart(widgetId);
-        },
-        onPanResponderMove: (_, gestureState) => {
-          translateY.setValue(gestureState.dy);
-        },
-        onPanResponderRelease: (_, gestureState) => {
-          onDragEnd(gestureState.dy);
-        },
-        onPanResponderTerminate: (_, gestureState) => {
-          onDragEnd(gestureState.dy);
-        },
-      }),
-    [onDragEnd, onDragStart, translateY, widgetId],
-  );
-
-  return (
-    <NativeAnimated.View
-      onLayout={(event) => onLayout(widgetId, event)}
-      style={[
-        styles.widgetSlot,
-        styles.widgetCardContainer,
-        isDragging && styles.widgetCardDragging,
-        isDragging ? { transform: [{ translateY }] } : null,
-      ]}
-      {...panResponder.panHandlers}
-    >
-      <WidgetComponent />
-    </NativeAnimated.View>
-  );
-}
-
 function ActivitySection() {
   return (
     <View style={styles.postCard}>
@@ -646,7 +522,7 @@ function ActivitySection() {
           <Text style={styles.postAction}>Voir tout</Text>
         </Pressable>
       </View>
-      {transactions.slice(0, 10).map((transaction) => (
+      {transactions.slice(0, 4).map((transaction) => (
         <TransactionRow key={`${transaction.title}-${transaction.amount}`} transaction={transaction} />
       ))}
     </View>
@@ -879,11 +755,21 @@ function RecentDocumentsSection() {
   );
 }
 
-function AddWidgetButton() {
+function AddWidgetButton({ homeWidgets }: { homeWidgets: HomeWidgetConfig[] }) {
   return (
-    <Pressable disabled style={[styles.addWidgetButton, styles.addWidgetButtonDisabled]}>
+    <Pressable
+      style={styles.addWidgetButton}
+      onPress={() =>
+        router.push({
+          pathname: "/widget-create",
+          params: {
+            activeWidgets: homeWidgets.filter((widget) => widget.enabled).map((widget) => widget.id).join(","),
+          },
+        })
+      }
+    >
       <MaterialIcons name="add-circle-outline" size={18} color="#111827" />
-      <Text style={styles.addWidgetButtonText}>Ajouter un widget</Text>
+      <Text style={styles.addWidgetButtonText}>Organiser les widgets</Text>
     </Pressable>
   );
 }
@@ -1473,17 +1359,6 @@ const styles = StyleSheet.create({
   widgetSlot: {
     marginBottom: 6,
   },
-  widgetCardContainer: {
-    position: "relative",
-  },
-  widgetCardDragging: {
-    zIndex: 20,
-    elevation: 8,
-    shadowColor: "#111827",
-    shadowOpacity: 0.14,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 14 },
-  },
   postCard: {
     borderWidth: 1,
     borderColor: "#D1D5DB",
@@ -1732,9 +1607,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderStyle: "dashed",
     backgroundColor: "#FFFFFF",
-  },
-  addWidgetButtonDisabled: {
-    opacity: 0.55,
   },
   addWidgetButtonText: {
     color: "#111827",

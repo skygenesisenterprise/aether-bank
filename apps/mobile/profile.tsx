@@ -55,7 +55,7 @@ const menuItems: { icon: IconName; label: string; badge?: string; route?: "/prof
 
 export default function ProfileScreen() {
   const insets = usePhoneSafeAreaInsets();
-  const { signOut } = useMobileAuth();
+  const { biometricEnabled, biometricLabel, signOut } = useMobileAuth();
 
   return (
     <ScreenTransition direction="up">
@@ -69,7 +69,7 @@ export default function ProfileScreen() {
         >
           <Header />
           <UserHero />
-          <SecurityCard />
+          <SecurityCard biometricEnabled={biometricEnabled} biometricLabel={biometricLabel} />
           <MenuCard />
           <LogoutButton onPress={signOut} />
           <Footer />
@@ -108,7 +108,7 @@ function UserHero() {
   );
 }
 
-function SecurityCard() {
+function SecurityCard({ biometricEnabled, biometricLabel }: { biometricEnabled: boolean; biometricLabel: string }) {
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
@@ -120,8 +120,8 @@ function SecurityCard() {
 
       <View style={styles.securityRows}>
         <View style={styles.securityRow}>
-          <MaterialIcons name="check-circle" size={16} color="#1F8A4C" />
-          <Text style={styles.securityRowText}>Face ID activé</Text>
+          <MaterialIcons name={biometricEnabled ? "check-circle" : "info-outline"} size={16} color={biometricEnabled ? "#1F8A4C" : "#6B7280"} />
+          <Text style={styles.securityRowText}>{biometricEnabled ? `${biometricLabel} activé` : `${biometricLabel} désactivé`}</Text>
         </View>
         <View style={styles.securityRow}>
           <MaterialIcons name="check-circle" size={16} color="#1F8A4C" />

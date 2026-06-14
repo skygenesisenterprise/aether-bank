@@ -4,12 +4,14 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { useMobileAuth } from "@/components/mobile/mobile-auth-provider";
 import { ScreenTransition } from "@/components/mobile/screen-transition";
 import { usePhoneSafeAreaInsets } from "@/components/mobile/use-phone-safe-area";
 
 type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
 
 interface SecurityFeature {
+  id: string;
   title: string;
   description: string;
   icon: IconName;
@@ -34,48 +36,6 @@ interface LoginEvent {
   status: "success" | "failed";
   icon: IconName;
 }
-
-const securityFeatures: SecurityFeature[] = [
-  {
-    title: "Authentification à deux facteurs",
-    description: "Protégez votre connexion avec une double vérification.",
-    icon: "security",
-    enabled: true,
-    lastUpdated: "Activé le 15 mai 2026",
-  },
-  {
-    title: "Face ID",
-    description: "Déverrouillage et paiements par reconnaissance faciale.",
-    icon: "face",
-    enabled: true,
-    lastUpdated: "Activé le 2 janvier 2026",
-  },
-  {
-    title: "Empreinte digitale",
-    description: "Authentification biométrique par empreinte.",
-    icon: "fingerprint",
-    enabled: false,
-  },
-  {
-    title: "Code PIN transaction",
-    description: "Code requis pour valider les virements.",
-    icon: "pin",
-    enabled: true,
-    lastUpdated: "Modifié le 8 juin 2026",
-  },
-  {
-    title: "Notifications de connexion",
-    description: "Recevez une alerte à chaque nouvelle connexion.",
-    icon: "notifications-active",
-    enabled: true,
-  },
-  {
-    title: "Verrouillage automatique",
-    description: "Déconnexion après 5 minutes d'inactivité.",
-    icon: "lock",
-    enabled: true,
-  },
-];
 
 const activeSessions: ActiveSession[] = [
   {
@@ -149,19 +109,94 @@ const loginHistory: LoginEvent[] = [
 
 export default function ProfileSecurityScreen() {
   const insets = usePhoneSafeAreaInsets();
+  const {
+    biometricAvailable,
+    biometricEnabled,
+    biometricLabel,
+    biometricReason,
+    disableBiometrics,
+    enableBiometrics,
+    lockSession,
+  } = useMobileAuth();
+
+  const securityFeatures = React.useMemo<SecurityFeature[]>(
+    () => [
+      {
+        id: "2fa",
+        title: "Authentification à deux facteurs",
+        description: "Protégez votre connexion avec une double vérification.",
+        icon: "security",
+        enabled: true,
+        lastUpdated: "Activé le 15 mai 2026",
+      },
+      {
+        id: "biometric",
+        title: biometricLabel === "Face ID" ? "Face ID" : biometricLabel === "Touch ID" ? "Touch ID" : "Biometrie",
+        description: `Déverrouillage et validations avec ${biometricLabel}.`,
+        icon: biometricLabel === "Face ID" ? "face" : "fingerprint",
+        enabled: biometricEnabled,
+        lastUpdated: biometricEnabled ? "Active sur cet appareil" : biometricAvailable ? "Disponible sur cet appareil" : "Non disponible sur cet appareil",
+      },
+      {
+        id: "transaction-pin",
+        title: "Code PIN transaction",
+        description: "Code requis pour valider les virements.",
+        icon: "pin",
+        enabled: true,
+        lastUpdated: "Modifié le 8 juin 2026",
+      },
+      {
+        id: "login-notifications",
+        title: "Notifications de connexion",
+        description: "Recevez une alerte à chaque nouvelle connexion.",
+        icon: "notifications-active",
+        enabled: true,
+      },
+      {
+        id: "auto-lock",
+        title: "Verrouillage automatique",
+        description: "Verrouille l'app lorsqu'elle passe en arriere-plan.",
+        icon: "lock",
+        enabled: biometricEnabled,
+        lastUpdated: biometricEnabled ? "Lie a l'authentification biométrique" : "Activez la biometrie pour l'utiliser",
+      },
+    ],
+    [biometricAvailable, biometricEnabled, biometricLabel],
+  );
 
   const handleFeatureToggle = React.useCallback((feature: SecurityFeature) => {
-    Alert.alert(
-      feature.title,
-      feature.enabled
-        ? `Désactiver ${feature.title.toLowerCase()} ?`
-        : `Activer ${feature.title.toLowerCase()} ?`,
-      [
+    if (feature.id !== "biometric") {
+      Alert.alert(
+        feature.title,
+        feature.enabled
+          ? `Désactiver ${feature.title.toLowerCase()} ?`
+          : `Activer ${feature.title.toLowerCase()} ?`,
+        [
+          { text: "Annuler", style: "cancel" },
+          { text: feature.enabled ? "Désactiver" : "Activer" },
+        ],
+      );
+      return;
+    }
+
+    if (feature.enabled) {
+      Alert.alert("Désactiver la biométrie", `Retirer ${biometricLabel} de cet appareil ?`, [
         { text: "Annuler", style: "cancel" },
-        { text: feature.enabled ? "Désactiver" : "Activer" },
-      ],
-    );
-  }, []);
+        {
+          text: "Désactiver",
+          style: "destructive",
+          onPress: () => disableBiometrics(),
+        },
+      ]);
+      return;
+    }
+
+    void enableBiometrics().then((result) => {
+      if (!result.ok) {
+        Alert.alert("Biometrie indisponible", result.error ?? "Impossible d'activer la biometrie.", [{ text: "OK" }]);
+      }
+    });
+  }, [biometricLabel, disableBiometrics, enableBiometrics]);
 
   const handleSessionPress = React.useCallback((session: ActiveSession) => {
     if (session.isCurrent) {
@@ -192,6 +227,22 @@ export default function ProfileSecurityScreen() {
       { text: "Révoquer", style: "destructive" },
     ]);
   }, []);
+
+  const handleBiometricPrimaryAction = React.useCallback(async () => {
+    if (biometricEnabled) {
+      lockSession();
+      return;
+    }
+
+    const result = await enableBiometrics();
+
+    if (!result.ok) {
+      Alert.alert("Biometrie indisponible", result.error ?? "Impossible d'activer la biometrie.", [{ text: "OK" }]);
+      return;
+    }
+
+    Alert.alert("Biometrie activee", `${biometricLabel} est maintenant active sur cet iPhone.`, [{ text: "OK" }]);
+  }, [biometricEnabled, biometricLabel, enableBiometrics, lockSession]);
 
   return (
     <ScreenTransition direction="up">
@@ -228,6 +279,36 @@ export default function ProfileSecurityScreen() {
             </View>
           </View>
 
+          <View style={styles.biometricCard}>
+            <View style={styles.biometricHeader}>
+              <View style={styles.biometricHeaderIcon}>
+                <MaterialIcons name="fingerprint" size={20} color="#111827" />
+              </View>
+              <View style={styles.biometricHeaderCopy}>
+                <Text style={styles.biometricTitle}>{biometricLabel}</Text>
+                <Text style={styles.biometricSubtitle}>
+                  {biometricEnabled
+                    ? `${biometricLabel} est actif sur cet appareil.`
+                    : biometricAvailable
+                      ? `Activez ${biometricLabel} pour le tester directement sur votre iPhone.`
+                      : biometricReason ?? "La biometrie n'est pas disponible sur cet appareil."}
+                </Text>
+              </View>
+            </View>
+
+            <Pressable style={styles.biometricPrimaryButton} onPress={() => void handleBiometricPrimaryAction()}>
+              <Text style={styles.biometricPrimaryButtonText}>
+                {biometricEnabled ? `Tester ${biometricLabel}` : `Activer ${biometricLabel}`}
+              </Text>
+            </Pressable>
+
+            {biometricEnabled ? (
+              <Pressable style={styles.biometricSecondaryButton} onPress={() => disableBiometrics()}>
+                <Text style={styles.biometricSecondaryButtonText}>Desactiver</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Mots de passe</Text>
@@ -255,8 +336,8 @@ export default function ProfileSecurityScreen() {
                 onPress={() => handleFeatureToggle(feature)}
               >
                 <View style={styles.featureIcon}>
-                  <MaterialIcons name={feature.icon} size={18} color="#111827" />
-                </View>
+                    <MaterialIcons name={feature.icon} size={18} color="#111827" />
+                  </View>
                 <View style={styles.featureCopy}>
                   <Text style={styles.featureTitle}>{feature.title}</Text>
                   <Text style={styles.featureDescription}>{feature.description}</Text>
@@ -423,6 +504,74 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     fontWeight: "600",
     marginTop: 2,
+  },
+  biometricCard: {
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 14,
+    backgroundColor: "#FFFFFF",
+  },
+  biometricHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  biometricHeaderIcon: {
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    backgroundColor: "#F3F4F6",
+  },
+  biometricHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  biometricTitle: {
+    color: "#05070A",
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: "900",
+  },
+  biometricSubtitle: {
+    color: "#6B7280",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "600",
+    marginTop: 4,
+  },
+  biometricPrimaryButton: {
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 999,
+    marginTop: 16,
+    backgroundColor: "#111827",
+  },
+  biometricPrimaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "900",
+  },
+  biometricSecondaryButton: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 999,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    backgroundColor: "#FFFFFF",
+  },
+  biometricSecondaryButtonText: {
+    color: "#111827",
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: "800",
   },
   sectionCard: {
     borderWidth: 1,

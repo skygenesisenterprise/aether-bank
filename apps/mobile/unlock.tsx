@@ -2,15 +2,11 @@ import * as React from "react";
 
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { useMobileAuth } from "@/components/mobile/mobile-auth-provider";
 import { ScreenTransition } from "@/components/mobile/screen-transition";
 import { usePhoneSafeAreaInsets } from "@/components/mobile/use-phone-safe-area";
-
-// TODO: Connect expo-local-authentication for Face ID / Android Biometrics
-// TODO: Connect secure session restore
-// TODO: Connect token refresh with Aether Identity
-// TODO: Connect device trust management
 
 const user = {
   prenom: "Liam",
@@ -22,24 +18,58 @@ const user = {
 
 export default function UnlockScreen() {
   const insets = usePhoneSafeAreaInsets();
+  const {
+    biometricEnabled,
+    biometricLabel,
+    isAuthenticated,
+    session,
+    signOut,
+    unlockWithBiometrics,
+  } = useMobileAuth();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [error, setError] = React.useState("");
 
-  function handleBiometric() {
-    // TODO: Connect expo-local-authentication for Face ID / Android Biometrics
-    router.replace("/");
-  }
+  const biometricButtonLabel = `Déverrouiller avec ${biometricLabel}`;
 
-  function handlePassword() {
+  const handleBiometric = React.useCallback(async () => {
+    setIsSubmitting(true);
+    setError("");
+
+    const result = await unlockWithBiometrics();
+
+    setIsSubmitting(false);
+
+    if (!result.ok) {
+      setError(result.error ?? "Authentification biométrique refusée.");
+      return;
+    }
+
+    router.replace("/home");
+  }, [unlockWithBiometrics]);
+
+  const handlePassword = React.useCallback(() => {
+    signOut();
     router.replace("/login");
-  }
+  }, [signOut]);
 
-  function handleSwitchAccount() {
+  const handleSwitchAccount = React.useCallback(() => {
+    signOut();
     router.replace("/login");
-  }
+  }, [signOut]);
 
-  const biometricLabel =
-    Platform.OS === "android"
-      ? "Déverrouiller avec biométrie"
-      : "Déverrouiller avec Face ID";
+  React.useEffect(() => {
+    if (!isAuthenticated) {
+      router.replace("/login");
+      return;
+    }
+
+    if (biometricEnabled) {
+      void handleBiometric();
+    }
+  }, [biometricEnabled, handleBiometric, isAuthenticated]);
+
+  const firstName = session?.user.firstName ?? user.prenom;
+  const initials = `${session?.user.firstName?.[0] ?? user.initials[0]}${session?.user.lastName?.[0] ?? user.initials[1] ?? ""}`.trim();
 
   return (
     <ScreenTransition>
@@ -57,13 +87,13 @@ export default function UnlockScreen() {
 
           <View style={styles.welcomeCard}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{user.initials}</Text>
+              <Text style={styles.avatarText}>{initials}</Text>
               <View style={styles.avatarBadge}>
                 <MaterialIcons name="verified" size={12} color="#FFFFFF" />
               </View>
             </View>
 
-            <Text style={styles.welcomeTitle}>Bon retour, {user.prenom}</Text>
+            <Text style={styles.welcomeTitle}>Bon retour, {firstName}</Text>
             <Text style={styles.welcomeSub}>Déverrouillez Aether Bank</Text>
 
             <View style={styles.userInfoCard}>
@@ -79,9 +109,16 @@ export default function UnlockScreen() {
               </View>
             </View>
 
-            <Pressable style={styles.primaryButton} onPress={handleBiometric}>
+            {error ? (
+              <View style={styles.notice}>
+                <MaterialIcons name="info-outline" size={16} color="#92400E" />
+                <Text style={styles.noticeText}>{error}</Text>
+              </View>
+            ) : null}
+
+            <Pressable style={[styles.primaryButton, isSubmitting && styles.primaryButtonDisabled]} onPress={() => void handleBiometric()} disabled={isSubmitting}>
               <MaterialIcons name="fingerprint" size={22} color="#FFFFFF" />
-              <Text style={styles.primaryButtonText}>{biometricLabel}</Text>
+              <Text style={styles.primaryButtonText}>{isSubmitting ? "Vérification..." : biometricButtonLabel}</Text>
             </Pressable>
 
             <Pressable style={styles.secondaryButton} onPress={handlePassword}>
@@ -198,6 +235,24 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     fontWeight: "700",
   },
+  notice: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#FCD34D",
+    borderRadius: 12,
+    padding: 11,
+    backgroundColor: "#FFFBEB",
+  },
+  noticeText: {
+    flex: 1,
+    color: "#92400E",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "700",
+  },
   primaryButton: {
     width: "100%",
     height: 50,
@@ -207,6 +262,9 @@ const styles = StyleSheet.create({
     gap: 10,
     borderRadius: 999,
     backgroundColor: "#111827",
+  },
+  primaryButtonDisabled: {
+    opacity: 0.6,
   },
   primaryButtonText: {
     color: "#FFFFFF",
