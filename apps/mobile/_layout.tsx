@@ -187,7 +187,10 @@ function MobileLayoutTabs() {
       <Tabs.Screen name="profile-settings" options={{ href: null, tabBarStyle: { display: "none" } }} />
 
       <Tabs.Screen name="cards" options={{ href: null, tabBarStyle: { display: "none" } }} />
+      <Tabs.Screen name="cards-partner" options={{ href: null, tabBarStyle: { display: "none" } }} />
+      <Tabs.Screen name="cards-partner-scan" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="cards-detail" options={{ href: null, tabBarStyle: { display: "none" } }} />
+      <Tabs.Screen name="cards-detail-settings" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="cards-create" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="cards-create-option" options={{ href: null, tabBarStyle: { display: "none" } }} />
 
@@ -197,6 +200,7 @@ function MobileLayoutTabs() {
       <Tabs.Screen name="account-wero" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="account-enterprise" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="account-vault" options={{ href: null, tabBarStyle: { display: "none" } }} />
+      <Tabs.Screen name="account-settings" options={{ href: null, tabBarStyle: { display: "none" } }} />
 
       <Tabs.Screen name="analytics" options={{ href: null, tabBarStyle: { display: "none" } }} />
 
@@ -206,7 +210,6 @@ function MobileLayoutTabs() {
 
       <Tabs.Screen name="transaction-detail" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="transactions" options={{ href: null, tabBarStyle: { display: "none" } }} />
-      <Tabs.Screen name="settings" options={{ href: null }} />
       <Tabs.Screen
         name="login"
         options={{

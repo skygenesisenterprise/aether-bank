@@ -26,6 +26,20 @@ function getExpoMaps() {
   }
 }
 
+function isLightHexColor(hex: string) {
+  const normalized = hex.replace("#", "");
+  if (normalized.length !== 6) {
+    return false;
+  }
+
+  const red = Number.parseInt(normalized.slice(0, 2), 16);
+  const green = Number.parseInt(normalized.slice(2, 4), 16);
+  const blue = Number.parseInt(normalized.slice(4, 6), 16);
+  const brightness = (red * 299 + green * 587 + blue * 114) / 1000;
+
+  return brightness > 186;
+}
+
 export default function CardsScreen() {
   const insets = usePhoneSafeAreaInsets();
 
@@ -110,20 +124,28 @@ function WalletRow({ card, isLast }: { card: PortfolioCardItem; isLast: boolean 
 }
 
 function CardPreview({ card }: { card: PortfolioCardItem }) {
-  return (
-    <View style={styles.cardPreview}>
-      <View style={styles.cardPreviewSheen} />
-      <View style={[styles.cardPreviewLine, styles.cardPreviewLineOne]} />
-      <View style={[styles.cardPreviewLine, styles.cardPreviewLineTwo]} />
-      <View style={[styles.cardPreviewLine, styles.cardPreviewLineThree]} />
+  const isLightCard = isLightHexColor(card.colors[0]);
+  const foregroundColor = isLightCard ? "#111827" : "#FFFFFF";
+  const mutedForegroundColor = isLightCard ? "rgba(17,24,39,0.68)" : "rgba(255,255,255,0.74)";
+  const lineColor = isLightCard ? "rgba(17,24,39,0.12)" : "rgba(255,255,255,0.16)";
+  const sheenColor = isLightCard ? "rgba(255,255,255,0.46)" : "rgba(255,255,255,0.1)";
 
-      <Text style={styles.cardPreviewBrand}>SGE</Text>
-      <View style={styles.cardPreviewChip}>
+  return (
+    <View style={[styles.cardPreview, { backgroundColor: card.colors[0], borderColor: isLightCard ? "#D1D5DB" : "#3F3F46" }]}>
+      <View style={[styles.cardPreviewOrb, { backgroundColor: card.colors[1] }]} />
+      <View style={[styles.cardPreviewSheen, { backgroundColor: sheenColor }]} />
+      <View style={[styles.cardPreviewLine, styles.cardPreviewLineOne, { backgroundColor: lineColor }]} />
+      <View style={[styles.cardPreviewLine, styles.cardPreviewLineTwo, { backgroundColor: lineColor }]} />
+      <View style={[styles.cardPreviewLine, styles.cardPreviewLineThree, { backgroundColor: lineColor }]} />
+
+      <Text style={[styles.cardPreviewBrand, { color: foregroundColor }]}>SGE</Text>
+      <View style={[styles.cardPreviewChip, { backgroundColor: isLightCard ? "rgba(17,24,39,0.12)" : "rgba(255,255,255,0.72)" }]}>
         <View style={styles.cardPreviewChipCore} />
       </View>
-      <MaterialIcons name="contactless" size={10} color="#A3A3A3" style={styles.cardPreviewContactless} />
+      <MaterialIcons name="contactless" size={10} color={mutedForegroundColor} style={styles.cardPreviewContactless} />
+      <Text style={[styles.cardPreviewDigits, { color: foregroundColor }]}>•• {card.last4}</Text>
 
-      {card.network === "visa" ? <Text style={styles.visaGlyph}>VISA</Text> : null}
+      {card.network === "visa" ? <Text style={[styles.visaGlyph, { color: foregroundColor }]}>VISA</Text> : null}
 
       {card.network === "mastercard" ? (
         <View style={styles.mastercardGlyph}>
@@ -132,7 +154,7 @@ function CardPreview({ card }: { card: PortfolioCardItem }) {
         </View>
       ) : null}
 
-      {!card.network ? <Text style={styles.rpayGlyph}>RPay</Text> : null}
+      {!card.network ? <Text style={[styles.rpayGlyph, { color: foregroundColor }]}>RPay</Text> : null}
     </View>
   );
 }
@@ -317,85 +339,100 @@ const styles = StyleSheet.create({
     width: 50,
     height: 30,
     borderWidth: 1,
-    borderColor: "#3F3F46",
-    borderRadius: 5,
-    marginRight: 12,
+    borderRadius: 7,
+    marginRight: 9,
     overflow: "hidden",
-    backgroundColor: "#0D0D0D",
+    flexShrink: 0,
+  },
+  cardPreviewOrb: {
+    position: "absolute",
+    top: -8,
+    right: -10,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    opacity: 0.92,
   },
   cardPreviewSheen: {
     position: "absolute",
-    top: -8,
-    right: 0,
-    width: 34,
-    height: 44,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    transform: [{ rotate: "24deg" }],
+    bottom: -4,
+    left: 14,
+    width: 28,
+    height: 16,
+    borderRadius: 12,
+    transform: [{ rotate: "-12deg" }],
   },
   cardPreviewLine: {
     position: "absolute",
-    right: -9,
-    width: 48,
+    right: -8,
+    width: 42,
     height: 1,
-    backgroundColor: "rgba(255,255,255,0.16)",
     transform: [{ rotate: "-18deg" }],
   },
   cardPreviewLineOne: {
-    top: 7,
+    top: 8,
   },
   cardPreviewLineTwo: {
     top: 13,
     opacity: 0.8,
   },
   cardPreviewLineThree: {
-    top: 19,
+    top: 18,
     opacity: 0.5,
   },
   cardPreviewBrand: {
     position: "absolute",
     top: 4,
     left: 5,
-    color: "#FFFFFF",
-    fontSize: 5,
-    lineHeight: 6,
+    fontSize: 4,
+    lineHeight: 5,
     fontWeight: "900",
-    letterSpacing: 1,
+    letterSpacing: 0.55,
   },
   cardPreviewChip: {
     position: "absolute",
-    left: 7,
-    top: 13,
-    width: 12,
-    height: 9,
+    left: 5,
+    top: 12,
+    width: 10,
+    height: 8,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 2,
-    backgroundColor: "#C7C7C7",
   },
   cardPreviewChipCore: {
-    width: 6,
-    height: 6,
-    borderRadius: 2,
+    width: 4,
+    height: 4,
+    borderRadius: 1.5,
     borderWidth: 1,
-    borderColor: "#8A8A8A",
+    borderColor: "rgba(113,113,122,0.5)",
   },
   cardPreviewContactless: {
     position: "absolute",
-    left: 22,
-    top: 13,
+    left: 18,
+    top: 11,
+  },
+  cardPreviewDigits: {
+    position: "absolute",
+    left: 5,
+    bottom: 4,
+    fontSize: 4,
+    lineHeight: 5,
+    fontWeight: "900",
+    letterSpacing: 0.1,
+    fontVariant: ["tabular-nums"],
   },
   mastercardGlyph: {
     position: "absolute",
-    right: 5,
-    bottom: 5,
-    width: 18,
-    height: 10,
+    right: 4,
+    bottom: 4,
+    width: 14,
+    height: 8,
   },
   mastercardCircle: {
     position: "absolute",
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   mastercardCircleLeft: {
     left: 0,
@@ -408,20 +445,20 @@ const styles = StyleSheet.create({
   },
   visaGlyph: {
     position: "absolute",
-    right: 5,
+    right: 4,
     bottom: 4,
     color: "#FFFFFF",
-    fontSize: 7,
-    lineHeight: 8,
+    fontSize: 6,
+    lineHeight: 7,
     fontWeight: "900",
   },
   rpayGlyph: {
     position: "absolute",
-    right: 5,
+    right: 4,
     bottom: 4,
     color: "#FFFFFF",
-    fontSize: 6,
-    lineHeight: 8,
+    fontSize: 5,
+    lineHeight: 6,
     fontWeight: "900",
   },
   walletCopy: {

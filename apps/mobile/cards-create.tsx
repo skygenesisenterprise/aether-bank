@@ -2,7 +2,7 @@ import * as React from "react";
 
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { ScreenTransition } from "@/components/mobile/screen-transition";
 import { usePhoneSafeAreaInsets } from "@/components/mobile/use-phone-safe-area";
@@ -82,7 +82,7 @@ export default function CardsCreateScreen() {
             ))}
           </View>
 
-          <Pressable style={styles.existingCardLink} onPress={() => Alert.alert("Carte existante", "Association bientôt disponible.")}>
+          <Pressable style={styles.existingCardLink} onPress={() => router.push("/cards-partner")}>
             <Text style={styles.existingCardText}>Vous avez déjà une carte Aether ?</Text>
             <Text style={styles.existingCardAction}>Liez-la maintenant</Text>
           </Pressable>

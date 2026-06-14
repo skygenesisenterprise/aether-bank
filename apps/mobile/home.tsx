@@ -224,45 +224,66 @@ const HOME_HEADER_HEIGHT = 62;
 
 export default function HomeScreen() {
   const insets = usePhoneSafeAreaInsets();
-  const params = useLocalSearchParams<{ widgetOrder?: string; updatedAt?: string }>();
+  const params = useLocalSearchParams<{ widgetOrder?: string; accountOrder?: string; updatedAt?: string }>();
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [activeQuickAction, setActiveQuickAction] = React.useState<QuickActionType | null>(null);
   const [refreshing, setRefreshing] = React.useState(false);
   const [homeWidgets, setHomeWidgets] = React.useState(defaultHomeWidgets);
+  const [homeAccounts, setHomeAccounts] = React.useState(accounts);
   const portal = usePortal();
   const lastHandledUpdatedAtRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
     const widgetOrder = params.widgetOrder;
+    const accountOrder = params.accountOrder;
     const updatedAt = params.updatedAt;
 
-    if (typeof widgetOrder !== "string" || typeof updatedAt !== "string" || lastHandledUpdatedAtRef.current === updatedAt) {
+    if (typeof updatedAt !== "string" || lastHandledUpdatedAtRef.current === updatedAt) {
       return;
     }
 
     lastHandledUpdatedAtRef.current = updatedAt;
 
-    const orderedWidgetIds = widgetOrder
-      .split(",")
-      .map((widgetId) => widgetId.trim())
-      .filter((widgetId): widgetId is HomeWidgetId => defaultHomeWidgets.some((widget) => widget.id === widgetId));
+    if (typeof widgetOrder === "string") {
+      const orderedWidgetIds = widgetOrder
+        .split(",")
+        .map((widgetId) => widgetId.trim())
+        .filter((widgetId): widgetId is HomeWidgetId => defaultHomeWidgets.some((widget) => widget.id === widgetId));
 
-    setHomeWidgets(() => {
-      const orderedSet = new Set(orderedWidgetIds);
-      const orderedWidgets = orderedWidgetIds.map((widgetId) => ({ id: widgetId, enabled: true }));
-      const remainingWidgets = defaultHomeWidgets
-        .filter((widget) => !orderedSet.has(widget.id))
-        .map((widget) => ({ ...widget, enabled: false }));
+      setHomeWidgets(() => {
+        const orderedSet = new Set(orderedWidgetIds);
+        const orderedWidgets = orderedWidgetIds.map((widgetId) => ({ id: widgetId, enabled: true }));
+        const remainingWidgets = defaultHomeWidgets
+          .filter((widget) => !orderedSet.has(widget.id))
+          .map((widget) => ({ ...widget, enabled: false }));
 
-      return [...orderedWidgets, ...remainingWidgets];
-    });
-  }, [params.updatedAt, params.widgetOrder]);
+        return [...orderedWidgets, ...remainingWidgets];
+      });
+    }
+
+    if (typeof accountOrder === "string") {
+      const orderedAccountIds = accountOrder
+        .split(",")
+        .map((accountId) => accountId.trim())
+        .filter((accountId) => accounts.some((account) => account.id === accountId));
+
+      setHomeAccounts(() => {
+        const orderedSet = new Set(orderedAccountIds);
+        const orderedAccounts = orderedAccountIds
+          .map((accountId) => accounts.find((account) => account.id === accountId))
+          .filter((account): account is Account => account !== undefined);
+        const remainingAccounts = accounts.filter((account) => !orderedSet.has(account.id));
+
+        return [...orderedAccounts, ...remainingAccounts];
+      });
+    }
+  }, [params.accountOrder, params.updatedAt, params.widgetOrder]);
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 800);
   }, []);
-  const activeAccount = accounts[activeIndex];
+  const activeAccount = homeAccounts[activeIndex] ?? homeAccounts[0];
 
   const handleCloseQuickAction = React.useCallback(() => {
     setActiveQuickAction(null);
@@ -296,7 +317,12 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6B7280" colors={["#6B7280"]} />}
         >
-          <HeroSection activeIndex={activeIndex} onIndexChange={setActiveIndex} />
+          <HeroSection
+            activeIndex={activeIndex}
+            onIndexChange={setActiveIndex}
+            accounts={homeAccounts}
+            activeWidgetIds={homeWidgets.filter((widget) => widget.enabled).map((widget) => widget.id)}
+          />
 
           <View style={styles.quickActionRow}>
             {quickActions.map((action) => (
@@ -335,7 +361,17 @@ export default function HomeScreen() {
   );
 }
 
-function HeroSection({ activeIndex, onIndexChange }: { activeIndex: number; onIndexChange: (index: number) => void }) {
+function HeroSection({
+  activeIndex,
+  onIndexChange,
+  accounts,
+  activeWidgetIds,
+}: {
+  activeIndex: number;
+  onIndexChange: (index: number) => void;
+  accounts: Account[];
+  activeWidgetIds: HomeWidgetId[];
+}) {
   const [cardWidth, setCardWidth] = React.useState(0);
   const scrollRef = React.useRef<ScrollView>(null);
 
@@ -372,9 +408,21 @@ function HeroSection({ activeIndex, onIndexChange }: { activeIndex: number; onIn
                 <Text style={styles.heroAccountType}>{account.label}</Text>
                 <Text style={styles.heroAccountAmount}>{account.balance}</Text>
                 <Text style={styles.heroAccountMeta}>{account.meta}</Text>
-                <View style={styles.walletButton}>
+                <Pressable
+                  style={styles.walletButton}
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    router.push({
+                      pathname: "/account-settings",
+                      params: {
+                        accountOrder: accounts.map((currentAccount) => currentAccount.id).join(","),
+                        widgetOrder: activeWidgetIds.join(","),
+                      },
+                    });
+                  }}
+                >
                   <Text style={styles.walletButtonText}>Comptes et Portefeuilles</Text>
-                </View>
+                </Pressable>
               </Pressable>
             ))}
           </ScrollView>

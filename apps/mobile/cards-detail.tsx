@@ -1,8 +1,8 @@
 import * as React from "react";
 
-import { MaterialIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Animated, Easing, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { ScreenTransition } from "@/components/mobile/screen-transition";
 import { usePhoneSafeAreaInsets } from "@/components/mobile/use-phone-safe-area";
@@ -10,12 +10,134 @@ import { getPortfolioCard, portfolioCards } from "@/data/cards";
 
 type ActionIcon = React.ComponentProps<typeof MaterialIcons>["name"];
 
+function hashCardSeed(input: string) {
+  return input.split("").reduce((acc, char) => {
+    return (acc * 31 + char.charCodeAt(0)) % 1000003;
+  }, 17);
+}
+
+function buildCardNumber(seed: number, last4: string) {
+  const groups = Array.from({ length: 3 }, (_, index) => {
+    const value = ((seed + index * 137) % 9000) + 1000;
+    return String(value);
+  });
+  return [...groups, last4].join(" ");
+}
+
+function buildExpiry(seed: number) {
+  const month = ((seed % 12) + 1).toString().padStart(2, "0");
+  const year = ((seed % 5) + 27).toString().padStart(2, "0");
+  return `${month}/${year}`;
+}
+
+function buildCvc(seed: number) {
+  return String((seed % 900) + 100);
+}
+
 export default function CardsDetailScreen() {
   const insets = usePhoneSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const rawId = Array.isArray(id) ? id[0] : id;
   const decodedId = rawId ? decodeURIComponent(rawId) : "";
   const card = getPortfolioCard(decodedId) ?? portfolioCards[0];
+  const [showSensitiveDetails, setShowSensitiveDetails] = React.useState(false);
+  const revealProgress = React.useRef(new Animated.Value(0)).current;
+  const cardSeed = React.useMemo(() => hashCardSeed(`${card.id}:${card.last4}:${card.currency}`), [card.currency, card.id, card.last4]);
+  const cardNumber = React.useMemo(() => buildCardNumber(cardSeed, card.last4), [card.last4, cardSeed]);
+  const expiry = React.useMemo(() => buildExpiry(cardSeed), [cardSeed]);
+  const cvc = React.useMemo(() => buildCvc(cardSeed), [cardSeed]);
+  const isWalletEligible = card.subtitle === "Prête à l'emploi";
+  const shouldHideRecentActivity = card.subtitle === "Prête à l'emploi";
+  const walletBranding = React.useMemo(() => {
+    if (Platform.OS === "ios") {
+      return {
+        title: "Ajouter à Apple Wallet",
+        subtitle: "Disponible immédiatement dans Apple Pay.",
+        scheme: "shoebox://",
+        fallback: "https://support.apple.com/wallet",
+      };
+    }
+
+    return {
+      title: "Ajouter à Google Wallet",
+      subtitle: "Disponible immédiatement dans Google Pay.",
+      scheme: "intent://wallet.google/#Intent;scheme=https;package=com.google.android.apps.walletnfcrel;end",
+      fallback: "https://wallet.google/",
+    };
+  }, []);
+
+  const showCardInfo = React.useCallback((visible: boolean) => {
+    Animated.timing(revealProgress, {
+      toValue: visible ? 1 : 0,
+      duration: 420,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [revealProgress]);
+
+  const handleActionPress = React.useCallback((action: (typeof card.actions)[number]) => {
+    if (action.id === "details") {
+      setShowSensitiveDetails((prev) => {
+        const next = !prev;
+        showCardInfo(next);
+        return next;
+      });
+      return;
+    }
+
+    if (action.id === "settings") {
+      router.push({
+        pathname: "/cards-detail-settings",
+        params: { id: card.id },
+      });
+      return;
+    }
+
+    Alert.alert(action.label, "Action simulée pour le moment.");
+  }, [card.id, showCardInfo]);
+
+  const handleWalletPress = React.useCallback(async () => {
+    try {
+      const supported = await Linking.canOpenURL(walletBranding.scheme);
+      if (supported) {
+        await Linking.openURL(walletBranding.scheme);
+        return;
+      }
+    } catch {
+      // Fall through to web fallback when the native scheme is unavailable.
+    }
+
+    try {
+      await Linking.openURL(walletBranding.fallback);
+    } catch {
+      Alert.alert("Wallet indisponible", "Impossible d'ouvrir le wallet sur cet appareil.");
+    }
+  }, [walletBranding.fallback, walletBranding.scheme]);
+
+  const maskedOpacity = revealProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+
+  const maskedScale = revealProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.96],
+  });
+
+  const revealedOpacity = revealProgress.interpolate({
+    inputRange: [0, 0.45, 1],
+    outputRange: [0, 0.18, 1],
+  });
+
+  const revealedTranslateY = revealProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [18, 0],
+  });
+
+  const revealedScale = revealProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.94, 1],
+  });
 
   return (
     <ScreenTransition direction="up">
@@ -35,48 +157,130 @@ export default function CardsDetailScreen() {
 
           <View style={styles.cardSurface}>
             <View style={styles.cardArtwork}>
-              <View style={styles.cardArtworkSheen} />
-              <View style={[styles.cardArtworkWave, styles.cardArtworkWaveOne]} />
-              <View style={[styles.cardArtworkWave, styles.cardArtworkWaveTwo]} />
-              <View style={[styles.cardArtworkWave, styles.cardArtworkWaveThree]} />
-              <View style={[styles.cardArtworkWave, styles.cardArtworkWaveFour]} />
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.cardArtworkFace,
+                  {
+                    opacity: maskedOpacity,
+                    transform: [{ scale: maskedScale }],
+                  },
+                ]}
+              >
+                <View style={styles.cardArtworkSheen} />
+                <View style={[styles.cardArtworkWave, styles.cardArtworkWaveOne]} />
+                <View style={[styles.cardArtworkWave, styles.cardArtworkWaveTwo]} />
+                <View style={[styles.cardArtworkWave, styles.cardArtworkWaveThree]} />
+                <View style={[styles.cardArtworkWave, styles.cardArtworkWaveFour]} />
 
-              <View style={styles.cardArtworkHeader}>
-                <Text style={styles.cardArtworkBrand}>SKY GENESIS ENTERPRISE</Text>
-                {card.currency ? (
-                  <View style={styles.currencyPill}>
-                    <MaterialIcons name="link" size={13} color="#D4D4D8" />
-                    <Text style={styles.currencyPillText}>{card.currency}</Text>
-                  </View>
-                ) : null}
-              </View>
-
-              <View style={styles.cardHardwareRow}>
-                <View style={styles.cardArtworkChip}>
-                  <View style={styles.cardArtworkChipCore} />
-                  <View style={styles.cardArtworkChipLineTop} />
-                  <View style={styles.cardArtworkChipLineBottom} />
-                </View>
-                <MaterialIcons name="contactless" size={34} color="#B8B8B8" />
-              </View>
-
-              <View style={styles.cardArtworkFooter}>
-                <View style={styles.cardNetworkBlock}>
-                  {card.network === "visa" ? (
-                    <Text style={styles.cardArtworkVisa}>VISA</Text>
-                  ) : card.network === "mastercard" ? (
-                    <View style={styles.mastercardGlyph}>
-                      <View style={[styles.mastercardCircle, styles.mastercardCircleLeft]} />
-                      <View style={[styles.mastercardCircle, styles.mastercardCircleRight]} />
+                <View style={styles.cardArtworkHeader}>
+                  <Text style={styles.cardArtworkBrand}>SKY GENESIS ENTERPRISE</Text>
+                  {card.currency ? (
+                    <View style={styles.currencyPill}>
+                      <MaterialIcons name="link" size={13} color="#D4D4D8" />
+                      <Text style={styles.currencyPillText}>{card.currency}</Text>
                     </View>
-                  ) : (
-                    <Text style={styles.cardArtworkVisa}>RPay</Text>
-                  )}
-                  <Text style={styles.cardNetworkLabel}>{card.network === "visa" ? "visa" : card.network === "mastercard" ? "mastercard" : "pay"}</Text>
+                  ) : null}
                 </View>
-              </View>
 
-              <Text style={styles.cardArtworkLast4}>•• {card.last4}</Text>
+                <View style={styles.cardHardwareRow}>
+                  <View style={styles.cardArtworkChip}>
+                    <View style={styles.cardArtworkChipCore} />
+                    <View style={styles.cardArtworkChipLineTop} />
+                    <View style={styles.cardArtworkChipLineBottom} />
+                  </View>
+                  <MaterialIcons name="contactless" size={34} color="#B8B8B8" />
+                </View>
+
+                <View style={styles.cardArtworkFooter}>
+                  <View style={styles.cardNetworkBlock}>
+                    {card.network === "visa" ? (
+                      <Text style={styles.cardArtworkVisa}>VISA</Text>
+                    ) : card.network === "mastercard" ? (
+                      <View style={styles.mastercardGlyph}>
+                        <View style={[styles.mastercardCircle, styles.mastercardCircleLeft]} />
+                        <View style={[styles.mastercardCircle, styles.mastercardCircleRight]} />
+                      </View>
+                    ) : (
+                      <Text style={styles.cardArtworkVisa}>RPay</Text>
+                    )}
+                    <Text style={styles.cardNetworkLabel}>{card.network === "visa" ? "visa" : card.network === "mastercard" ? "mastercard" : "pay"}</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.cardArtworkLast4}>•• {card.last4}</Text>
+              </Animated.View>
+
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.cardArtworkFace,
+                  styles.cardArtworkDetailsFace,
+                  {
+                    opacity: revealedOpacity,
+                    transform: [{ translateY: revealedTranslateY }, { scale: revealedScale }],
+                  },
+                ]}
+              >
+                <View style={styles.cardDetailsTopRow}>
+                  <View>
+                    <Text style={styles.cardDetailsLabel}>Card Holder</Text>
+                    <Text
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.82}
+                      style={styles.cardDetailsValue}
+                    >
+                      {card.title.toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.cardDetailsCurrencyPill}>
+                    <MaterialIcons name="verified-user" size={14} color="#111827" />
+                    <Text style={styles.cardDetailsCurrencyText}>{card.currency || "GLOBAL"}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.cardDetailsBody}>
+                  <View style={styles.cardDetailsChipRow}>
+                    <View style={styles.cardDetailsChip}>
+                      <View style={styles.cardDetailsChipCore} />
+                    </View>
+                    <MaterialIcons name="contactless" size={30} color="#111827" />
+                  </View>
+
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.76}
+                    style={styles.cardDetailsNumber}
+                  >
+                    {cardNumber}
+                  </Text>
+
+                  <View style={styles.cardDetailsMetaRow}>
+                    <View>
+                      <Text style={styles.cardDetailsLabel}>Expiry</Text>
+                      <Text style={styles.cardDetailsMetaValue}>{expiry}</Text>
+                    </View>
+                    <View>
+                      <Text style={styles.cardDetailsLabel}>CVC</Text>
+                      <Text style={styles.cardDetailsMetaValue}>{cvc}</Text>
+                    </View>
+                    <View style={styles.cardDetailsNetworkBlock}>
+                      {card.network === "visa" ? (
+                        <Text style={styles.cardDetailsVisa}>VISA</Text>
+                      ) : card.network === "mastercard" ? (
+                        <View style={styles.mastercardGlyph}>
+                          <View style={[styles.mastercardCircle, styles.mastercardCircleLeft]} />
+                          <View style={[styles.mastercardCircle, styles.mastercardCircleRight]} />
+                        </View>
+                      ) : (
+                        <Text style={styles.cardDetailsVisa}>RPay</Text>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              </Animated.View>
             </View>
           </View>
 
@@ -87,42 +291,82 @@ export default function CardsDetailScreen() {
                 <React.Fragment key={action.id}>
                   <Pressable
                     style={styles.actionItem}
-                    onPress={() => Alert.alert(action.label, "Action simulée pour le moment.")}
+                    onPress={() => handleActionPress(action)}
                   >
                     <View style={styles.actionIcon}>
                       <MaterialIcons name={action.icon as ActionIcon} size={20} color="#111827" />
                     </View>
-                    <Text style={styles.actionText}>{action.label}</Text>
+                    <Text style={styles.actionText}>
+                      {action.id === "details"
+                        ? showSensitiveDetails
+                          ? "Masquer les informations"
+                          : "Afficher les informations"
+                        : action.label}
+                    </Text>
                   </Pressable>
                   {index < card.actions.length - 1 ? <View style={styles.actionDivider} /> : null}
                 </React.Fragment>
               ))}
             </View>
 
+            {isWalletEligible ? (
+              <Pressable
+                style={styles.walletCta}
+                onPress={handleWalletPress}
+              >
+                <View style={styles.walletCtaIcon}>
+                  {Platform.OS === "ios" ? (
+                    <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
+                  ) : (
+                    <Ionicons name="logo-android" size={20} color="#FFFFFF" />
+                  )}
+                </View>
+                <View style={styles.walletCtaCopy}>
+                  <Text style={styles.walletCtaTitle}>{walletBranding.title}</Text>
+                  <Text style={styles.walletCtaSubtitle}>{walletBranding.subtitle}</Text>
+                </View>
+                <MaterialIcons name="chevron-right" size={20} color="#9CA3AF" />
+              </Pressable>
+            ) : null}
+
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Activité récente</Text>
-              <Pressable onPress={() => router.push("/transactions")}>
-                <Text style={styles.sectionAction}>Tout afficher</Text>
-              </Pressable>
+              {!shouldHideRecentActivity ? (
+                <Pressable onPress={() => router.push("/transactions")}>
+                  <Text style={styles.sectionAction}>Tout afficher</Text>
+                </Pressable>
+              ) : null}
             </View>
 
-            {card.activity.map((item, index) => (
-              <View key={item.id} style={[styles.activityRow, index < card.activity.length - 1 && styles.activityRowBorder]}>
-                <View style={styles.activityLeading}>
-                  <View style={styles.activityAvatar}>
-                    <Text style={styles.activityAvatarText}>{item.iconLabel}</Text>
-                    <View style={styles.activityErrorDot}>
-                      <MaterialIcons name="close" size={8} color="#FFFFFF" />
+            {shouldHideRecentActivity ? (
+              <View style={styles.emptyActivityCard}>
+                <View style={styles.emptyActivityIcon}>
+                  <MaterialIcons name="schedule" size={18} color="#6B7280" />
+                </View>
+                <Text style={styles.emptyActivityTitle}>Aucune activité récente</Text>
+                <Text style={styles.emptyActivitySubtitle}>
+                  Cette carte est prête à l'emploi et n'a pas encore ete utilisee.
+                </Text>
+              </View>
+            ) : (
+              card.activity.map((item, index) => (
+                <View key={item.id} style={[styles.activityRow, index < card.activity.length - 1 && styles.activityRowBorder]}>
+                  <View style={styles.activityLeading}>
+                    <View style={styles.activityAvatar}>
+                      <Text style={styles.activityAvatarText}>{item.iconLabel}</Text>
+                      <View style={styles.activityErrorDot}>
+                        <MaterialIcons name="close" size={8} color="#FFFFFF" />
+                      </View>
+                    </View>
+                    <View style={styles.activityCopy}>
+                      <Text style={styles.activityMerchant}>{item.merchant}</Text>
+                      <Text style={styles.activityMeta}>{item.date} · {item.status}</Text>
                     </View>
                   </View>
-                  <View style={styles.activityCopy}>
-                    <Text style={styles.activityMerchant}>{item.merchant}</Text>
-                    <Text style={styles.activityMeta}>{item.date} · {item.status}</Text>
-                  </View>
+                  <Text style={styles.activityAmount}>{item.amount}</Text>
                 </View>
-                <Text style={styles.activityAmount}>{item.amount}</Text>
-              </View>
-            ))}
+              ))
+            )}
           </View>
         </ScrollView>
       </View>
@@ -164,9 +408,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#3F3F46",
     overflow: "hidden",
+    backgroundColor: "#0B0B0B",
+  },
+  cardArtworkFace: {
+    ...StyleSheet.absoluteFillObject,
     padding: 18,
     justifyContent: "space-between",
-    backgroundColor: "#0B0B0B",
   },
   cardArtworkSheen: {
     position: "absolute",
@@ -270,6 +517,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: "900",
   },
+  cardArtworkDetailsFace: {
+    backgroundColor: "#F3F4F6",
+  },
   currencyPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -320,6 +570,109 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: "#F59E0B",
     opacity: 0.95,
+  },
+  cardDetailsTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  cardDetailsCurrencyPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: "#E5E7EB",
+  },
+  cardDetailsCurrencyText: {
+    color: "#111827",
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "900",
+  },
+  cardDetailsBody: {
+    marginTop: 10,
+  },
+  cardDetailsChipRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 18,
+  },
+  cardDetailsChip: {
+    width: 52,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#BDBDBD",
+    borderRadius: 8,
+    backgroundColor: "#E5E7EB",
+  },
+  cardDetailsChipCore: {
+    width: 18,
+    height: 22,
+    borderWidth: 1,
+    borderColor: "#A1A1AA",
+    borderRadius: 6,
+  },
+  cardDetailsLabel: {
+    color: "#6B7280",
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  cardDetailsValue: {
+    color: "#111827",
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: "900",
+    marginTop: 4,
+    maxWidth: 146,
+  },
+  cardDetailsNumber: {
+    color: "#111827",
+    fontSize: 22,
+    lineHeight: 24,
+    fontWeight: "900",
+    letterSpacing: 1.1,
+    fontVariant: ["tabular-nums"],
+  },
+  cardDetailsMetaRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    marginTop: 18,
+  },
+  cardDetailsMetaValue: {
+    color: "#111827",
+    fontSize: 14,
+    lineHeight: 17,
+    fontWeight: "900",
+    marginTop: 4,
+    fontVariant: ["tabular-nums"],
+  },
+  cardDetailsNetworkBlock: {
+    alignItems: "flex-end",
+    minWidth: 70,
+  },
+  cardDetailsVisa: {
+    color: "#111827",
+    fontSize: 20,
+    lineHeight: 22,
+    fontWeight: "900",
+  },
+  cardRevealHint: {
+    color: "#6B7280",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "700",
+    textAlign: "center",
+    marginTop: 10,
   },
   detailsPanel: {
     borderWidth: 1,
@@ -373,6 +726,40 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: "900",
   },
+  walletCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 16,
+    backgroundColor: "#F3F4F6",
+  },
+  walletCtaIcon: {
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    backgroundColor: "#111827",
+  },
+  walletCtaCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  walletCtaTitle: {
+    color: "#05070A",
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "900",
+  },
+  walletCtaSubtitle: {
+    color: "#6B7280",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "600",
+    marginTop: 2,
+  },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -390,6 +777,36 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontWeight: "900",
+  },
+  emptyActivityCard: {
+    alignItems: "center",
+    borderRadius: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 22,
+    backgroundColor: "#F9FAFB",
+  },
+  emptyActivityIcon: {
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    backgroundColor: "#E5E7EB",
+    marginBottom: 10,
+  },
+  emptyActivityTitle: {
+    color: "#05070A",
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "900",
+  },
+  emptyActivitySubtitle: {
+    color: "#6B7280",
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "600",
+    textAlign: "center",
+    marginTop: 4,
   },
   activityRow: {
     flexDirection: "row",

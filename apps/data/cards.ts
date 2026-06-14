@@ -121,24 +121,6 @@ export const portfolioCards: PortfolioCardItem[] = [
       { id: "c-3", merchant: "Kraken", date: "Hier, 09:40", status: "Converti depuis ETH", amount: "150,00 €", iconLabel: "K" },
     ],
   },
-  {
-    id: "revolut-pay",
-    title: "Revolut Pay",
-    subtitle: "Passage en caisse sécurisé en un clic",
-    currency: "",
-    colors: ["#FFFFFF", "#F1F1F1"],
-    last4: "0000",
-    actions: [
-      { id: "details", label: "Afficher les informations", icon: "visibility" },
-      { id: "freeze", label: "Geler", icon: "ac-unit" },
-      { id: "settings", label: "Paramètres", icon: "settings" },
-    ],
-    activity: [
-      { id: "r-1", merchant: "Apple Store", date: "Ven., 16:45", status: "Paiement 1-clic", amount: "49,00 €", iconLabel: "A" },
-      { id: "r-2", merchant: "Vinted", date: "Jeu., 12:21", status: "Paiement 1-clic", amount: "12,80 €", iconLabel: "V" },
-      { id: "r-3", merchant: "Deliveroo", date: "Mer., 20:05", status: "Paiement 1-clic", amount: "21,50 €", iconLabel: "D" },
-    ],
-  },
 ];
 
 export function getPortfolioCard(id?: string) {
